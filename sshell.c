@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+// #include <unistd.h>
 
 #define CMDLINE_MAX 512
 
@@ -14,7 +14,10 @@ int main(void)
                 int retval;
 
                 /* Print prompt */
-                printf("sshell$ ");
+                /* Follow assignment instruction 
+                   print 'sshell@ucd$ ' when ready to accept input
+                */
+                printf("sshell@ucd$ ");
                 fflush(stdout);
 
                 /* Get command line */
