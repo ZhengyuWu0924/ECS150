@@ -7,12 +7,38 @@
 
 #define CMDLINE_MAX 512
 
+char** tokenizer(char* cmdString) {
+    // We can assume that the command and arguments will be separated by a whitespace.
+
+    char* delimiter = " ";
+    char** tokens = malloc(17 * sizeof(char*)); // Prompt: maximum # of arguments is 16. So with the command, its 17.
+    for (int i = 0; i < 17; i++) {
+        tokens[i] = malloc(32 * sizeof(char)); // Prompt: max length of individual tokens is 32
+    }
+    char* string;
+
+    string = strtok(cmdString, delimiter);
+
+    // Keep strtok'ing until we get a NULL value
+    int index = 0;
+    while (string != NULL) {
+        tokens[index] = string;
+        index++;
+        string = strtok(NULL, delimiter);
+    }
+
+    return tokens;
+}
+
 // Implement the system() function by using fork+exec+wait method
 int sshellSystem(char *cmdString){
     pid_t pid;
-    char *args[] = {"sh","-c",cmdString, NULL};
-    int ret;
+    //char *args[] = {"sh","-c",cmdString, NULL}; // Chris's
+    char *args[] = {cmdString, "Hello", NULL}; // Mine
+    int exitStatus;
+
     pid = fork();
+
     if(pid == 0){
         execvp(args[0], args);
         perror("execvp");
@@ -20,12 +46,12 @@ int sshellSystem(char *cmdString){
     }else if(pid > 0){
         int status;
         waitpid(pid, &status, 0);
-        // printf("completed %d\n ", WEXITSTATUS(status));
+        exitStatus = WEXITSTATUS(status);
     }else{
         perror("fork");
         exit(1);
     }
-    return 0;
+    return exitStatus;
 }
 
 int main(void)
@@ -37,7 +63,7 @@ int main(void)
                 int retval;
 
                 /* Print prompt */
-                /* Follow assignment instruction 
+                /* Follow assignment instruction
                    print 'sshell@ucd$ ' when ready to accept input
                 */
                 printf("sshell@ucd$ ");
@@ -65,8 +91,12 @@ int main(void)
 
                 /* Regular command */
                 // retval = system(cmd);
+
+                char** tokens = malloc(sizeof(char*));
+                tokens = tokenizer(cmd);
+
                 retval = sshellSystem(cmd);
-                fprintf(stdout, "+ completed '%s': [%d]\n",
+                fprintf(stderr, "+ completed '%s': [%d]\n",
                         cmd, retval);
         }
 
