@@ -7,28 +7,32 @@
 
 #define CMDLINE_MAX 512
 
-char** tokenizer(char* cmdString) {
-    // We can assume that the command and arguments will be separated by a whitespace.
+/**
+ * Does not work
+ * Work on it later
+ */
+// char** tokenizer(char* cmdString) {
+//     // We can assume that the command and arguments will be separated by a whitespace.
 
-    char* delimiter = " ";
-    char** tokens = malloc(17 * sizeof(char*)); // Prompt: maximum # of arguments is 16. So with the command, its 17.
-    for (int i = 0; i < 17; i++) {
-        tokens[i] = malloc(32 * sizeof(char)); // Prompt: max length of individual tokens is 32
-    }
-    char* string;
+//     char* delimiter = " ";
+//     char** tokens = malloc(17 * sizeof(char*)); // Prompt: maximum # of arguments is 16. So with the command, its 17.
+//     for (int i = 0; i < 17; i++) {
+//         tokens[i] = malloc(32 * sizeof(char)); // Prompt: max length of individual tokens is 32
+//     }
+//     char* string;
 
-    string = strtok(cmdString, delimiter);
+//     string = strtok(cmdString, delimiter);
 
-    // Keep strtok'ing until we get a NULL value
-    int index = 0;
-    while (string != NULL) {
-        tokens[index] = string;
-        index++;
-        string = strtok(NULL, delimiter);
-    }
+//     // Keep strtok'ing until we get a NULL value
+//     int index = 0;
+//     while (string != NULL) {
+//         tokens[index] = string;
+//         index++;
+//         string = strtok(NULL, delimiter);
+//     }
 
-    return tokens;
-}
+//     return tokens;
+// }
 
 // Implement the system() function by using fork+exec+wait method
 int sshellSystem(char *cmdString){
@@ -52,6 +56,21 @@ int sshellSystem(char *cmdString){
         exit(1);
     }
     return exitStatus;
+}
+
+/**
+    @param: rawCMD --- user enter cmd
+    @param: returnVal --- value return from sshellsystem, the fork+exec+wait method
+    This Function will take the cmd ented by user, then make a copy
+    It will allows the program to print out the original cmd in each completation message.
+*/
+void print_completation(char* rawCMD, int returnVal){
+        int rawLen = strlen(rawCMD);
+        char* cmdCopy = (char *) malloc(rawLen);
+        strcpy(cmdCopy, rawCMD);
+        fprintf(stderr, "+ completed '%s': [%d]\n",
+                        cmdCopy, returnVal);
+        free(cmdCopy);
 }
 
 int main(void)
