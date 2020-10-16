@@ -8,69 +8,104 @@
 #define CMDLINE_MAX 512
 
 /**
- * Does not work
- * Work on it later
+ * @param: args[x][y] -- variable to store the command after spliting
+ * @author: Zhengyu Wu
+ * This struct will store the arguments generated from user command
+ * Due to professor's describtion, assume that:
+ * A program has a maximum of 16 arguments
+ * The maximum length of individual tokens never exceeds 32 characters
+ * 
+ * Set x = 16, y = 32;
  */
-// char** tokenizer(char* cmdString) {
-//     // We can assume that the command and arguments will be separated by a whitespace.
+typedef struct{
+        char agrs[16][32]; 
+        char* comPtr;
+}command;
 
-//     char* delimiter = " ";
-//     char** tokens = malloc(17 * sizeof(char*)); // Prompt: maximum # of arguments is 16. So with the command, its 17.
-//     for (int i = 0; i < 17; i++) {
-//         tokens[i] = malloc(32 * sizeof(char)); // Prompt: max length of individual tokens is 32
-//     }
-//     char* string;
+/**
+ * @param: com --- command structur variable to store the user command splitted by stytok()
+ * @param: cmdString --- original user command;
+ * @return: cmdStr --- a char* variable that store the generated user commnad (new command)
+ * @author: Zhengyu Wu
+ * @version: 2020.10.15 20:45 last edited.
+ * This function will be called in main(), then make an array to store all non-empty arguments in a 
+ * user command line.
+ * Example: user input: "echo hello | date" will be generated as
+ * "echo", "hello", "|", "date".
+ * 
+ */
+char* split_command(command* com, char* cmdString){
+        int index = 0;
+        // set memory location to struct pointer
+        com = (command *)malloc(16 * sizeof(command));
+        char* cmdStr = NULL;
+        // set memory location to string (char *)
+        cmdStr = (char *) malloc(16 * sizeof(command));
+        // set memory location to store token
+        char* token = (char *) malloc(16 * sizeof(char));
+        // split user command by " "
+        token = strtok(cmdString, " ");
+        // let the struct variable to store all tokens
+        // then store in a char* variable for further use
+        while(token != NULL){
+                strcpy(com->agrs[index], token);
+                // printf("%d---%s\n",index,com->agrs[index]); // for debug using only
+                token = strtok(NULL, " ");
+                strcat(cmdStr, com->agrs[index]);
+                strcat(cmdStr, " ");
+                index++;
+                if(token == NULL){
+                        strcpy(com->agrs[index], "\0");
+                        strcat(cmdStr, "\0");
+                        break;
+                }
+        }
+        free(token);
+        return cmdStr;
 
-//     string = strtok(cmdString, delimiter);
-
-//     // Keep strtok'ing until we get a NULL value
-//     int index = 0;
-//     while (string != NULL) {
-//         tokens[index] = string;
-//         index++;
-//         string = strtok(NULL, delimiter);
-//     }
-
-//     return tokens;
-// }
-
-// Implement the system() function by using fork+exec+wait method
-int sshellSystem(char *cmdString){
-    pid_t pid;
-    //char *args[] = {"sh","-c",cmdString, NULL}; // Chris's
-    char *args[] = {cmdString, "Hello", NULL}; // Mine
-    int exitStatus;
-
-    pid = fork();
-
-    if(pid == 0){
-        execvp(args[0], args);
-        perror("execvp");
-        exit(1);
-    }else if(pid > 0){
-        int status;
-        waitpid(pid, &status, 0);
-        exitStatus = WEXITSTATUS(status);
-    }else{
-        perror("fork");
-        exit(1);
-    }
-    return exitStatus;
 }
 
 /**
-    @param: rawCMD --- user enter cmd
+ * @param: cmdString --- user command
+ * @return: exitStatus --- check if this function exits corretlly
+ * @author: Zhengyu Wu
+ * @version: 2020.10.13 last edited
+ * This function usese fork+exec+wait method to implement the system()
+ */
+int sshellSystem(char* cmdString){
+        pid_t pid;
+        char *args[] = {"sh","-c",cmdString, NULL}; 
+        int exitStatus;
+
+        pid = fork();
+
+        if(pid == 0){
+                execvp(args[0], args);
+                perror("execvp");
+                exit(1);
+        }else if(pid > 0){
+                int status;
+                waitpid(pid, &status, 0);
+                exitStatus = WEXITSTATUS(status);
+        }else{
+                perror("fork");
+                exit(1);
+        }
+        return exitStatus;
+}
+
+
+/**
+    @param: cmdCopy --- a copy of user cmd
     @param: returnVal --- value return from sshellsystem, the fork+exec+wait method
+    @author: Zhengyu Wu
+    @version: 2020.10.14 last edited
     This Function will take the cmd ented by user, then make a copy
     It will allows the program to print out the original cmd in each completation message.
 */
-void print_completation(char* rawCMD, int returnVal){
-        int rawLen = strlen(rawCMD);
-        char* cmdCopy = (char *) malloc(rawLen);
-        strcpy(cmdCopy, rawCMD);
+void print_completation(char* cmdCopy, int returnVal){
         fprintf(stderr, "+ completed '%s': [%d]\n",
                         cmdCopy, returnVal);
-        free(cmdCopy);
 }
 
 int main(void)
@@ -107,16 +142,28 @@ int main(void)
                         fprintf(stderr, "Bye...\n");
                         break;
                 }
+                /*
+                        Make a copy of cmd entered by user
+                */
+                int rawLen = strlen(cmd);
+                char* cmdCopy = (char *) malloc(rawLen);
+                strcpy(cmdCopy, cmd);
+
 
                 /* Regular command */
                 // retval = system(cmd);
 
-                char** tokens = malloc(sizeof(char*));
-                tokens = tokenizer(cmd);
-
-                retval = sshellSystem(cmd);
-                fprintf(stderr, "+ completed '%s': [%d]\n",
-                        cmd, retval);
+                command* com = NULL;
+                char *newCmd = split_command(com, cmd);
+                
+                
+                retval = sshellSystem(newCmd);
+                
+                print_completation(cmdCopy,retval);
+                // Free the memorry
+                free(com); 
+                free(newCmd);
+                free(cmdCopy);
         }
 
         return EXIT_SUCCESS;
