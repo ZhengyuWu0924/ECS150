@@ -101,6 +101,38 @@ int sshellSystem(Command* com){
         }
         return exitStatus;
 }
+/**
+ *      Built-in Command --- 'exit'
+ *      Moved from main() (skeleton code given by professor)
+ *      As assignment prompy mentioned, this command will never be called
+ *      with incorrect argument.
+ *      'no argument for exit'
+ */
+
+int builtin_exit(Command* com){
+        fprintf(stderr, "Bye...\n");
+        return 0;
+}
+/**
+ *      Built-in Command --- 'cd'
+ *      Change working directory to the directory user enter
+ *      'exactly one argument for cd'
+ */ 
+int builtin_cd(Command* com){
+        // Assume exactly one argument for cd
+        chdir(com->args[1]);
+        return 0;
+
+}
+/**
+ *      Built-in Command --- 'pwd'
+ *      Print out current working directory
+ *      'no argument for pwd'
+ */
+int builtin_pwd(Command* com, char* workingDirectory){
+        fprintf(stderr, "%s\n", workingDirectory);
+        return 0;
+}
 
 
 /**
@@ -123,6 +155,7 @@ int main(void)
         while (1) {
                 char *nl;
                 int retval;
+                
 
                 /* Print prompt */
                 /* Follow assignment instruction
@@ -142,13 +175,8 @@ int main(void)
 
                 /* Remove trailing newline from command line */
                 nl = strchr(cmd, '\n');
-                if (nl)
+                if (nl){
                         *nl = '\0';
-
-                /* Builtin command */
-                if (!strcmp(cmd, "exit")) {
-                        fprintf(stderr, "Bye...\n");
-                        break;
                 }
                 /*
                         Make a copy of cmd entered by user
@@ -175,13 +203,30 @@ int main(void)
                     com->args[i] = malloc(32 * sizeof(char));
                 }
 
-
-
                 split_command(tokens, com);
-                retval = sshellSystem(com);
-                print_completation(cmdCopy,retval);
                 
-                
+                if (!strcmp(com->cmd, "exit")) {
+                        /* Builtin command */
+                        // Exit command --- 'exit'
+                        retval = builtin_exit(com);
+                        print_completation(cmdCopy, retval);
+                        break;
+                }else if(!strcmp(com->cmd, "cd")){
+                        // Change directory --- 'cd'
+                        retval = builtin_cd(com);
+                        print_completation(cmdCopy, retval);
+                }else if(!strcmp(com->cmd, "pwd")){
+                        // Print working directory command --- 'pwd'
+                        char working_dir[80];
+                        getcwd(working_dir, sizeof(working_dir));
+                        retval = builtin_pwd(com, working_dir);
+                        print_completation(cmdCopy,retval);
+                        
+                }else{
+                        retval = sshellSystem(com);
+                        print_completation(cmdCopy,retval);
+                }
+
                 // Free the memorry
                 free(com); 
                 free(tokens);
