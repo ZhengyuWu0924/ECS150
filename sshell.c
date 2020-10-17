@@ -9,24 +9,19 @@
 
 /**
  * @param: args[x][y] -- variable to store the command after spliting
- * @author: Zhengyu Wu
+ * @author: Zhengyu Wu, Akash
  * This struct will store the arguments generated from user command
- * Due to professor's describtion, assume that:
- * A program has a maximum of 16 arguments
- * The maximum length of individual tokens never exceeds 32 characters
- * 
- * Set x = 16, y = 32;
  */
 typedef struct{
-        char agrs[16][32]; 
-        char* comPtr;
-}command;
+    char* cmd;
+    char** args;
+}Command;
 
 /**
  * @param: com --- command structur variable to store the user command splitted by stytok()
  * @param: cmdString --- original user command;
  * @return: cmdStr --- a char* variable that store the generated user commnad (new command)
- * @author: Zhengyu Wu
+ * @author: Zhengyu Wu, Akash
  * @version: 2020.10.15 20:45 last edited.
  * This function will be called in main(), then make an array to store all non-empty arguments in a 
  * user command line.
@@ -34,60 +29,73 @@ typedef struct{
  * "echo", "hello", "|", "date".
  * 
  */
-char* split_command(command* com, char* cmdString){
-        int index = 0;
-        // set memory location to struct pointer
-        com = (command *)malloc(16 * sizeof(command));
-        char* cmdStr = NULL;
-        // set memory location to string (char *)
-        cmdStr = (char *) malloc(16 * sizeof(command));
-        // set memory location to store token
-        char* token = (char *) malloc(16 * sizeof(char));
-        // split user command by " "
-        token = strtok(cmdString, " ");
-        // let the struct variable to store all tokens
-        // then store in a char* variable for further use
-        while(token != NULL){
-                strcpy(com->agrs[index], token);
-                // printf("%d---%s\n",index,com->agrs[index]); // for debug using only
-                token = strtok(NULL, " ");
-                strcat(cmdStr, com->agrs[index]);
-                strcat(cmdStr, " ");
-                index++;
-                if(token == NULL){
-                        strcpy(com->agrs[index], "\0");
-                        strcat(cmdStr, "\0");
-                        break;
-                }
-        }
-        free(token);
-        return cmdStr;
+void split_command(char** tokens, Command* com) {
+    int index = 0;
 
+    // Copy command into cmd first
+    if (tokens[index] != NULL) {
+        strcpy(com->cmd, tokens[index]);
+    }
+    index++;
+
+    while (tokens[index] != NULL){
+        strcpy(com->args[index], tokens[index]);
+        index++;
+    }
+    while (index < 16) {
+        com->args[index] = NULL;
+        index++;
+    }
+}
+
+
+void tokenizer(char** tokens, char* cmdString) {
+    // We can assume that the command and arguments will be separated by a whitespace.
+
+    char* delimiter = " ";
+    char* string;
+
+    string = strtok(cmdString, delimiter);
+
+    // Keep strtok'ing until we get a NULL value
+    int index = 0;
+    while (string != NULL) {
+        strcpy(tokens[index], string);
+        index++;
+        string = strtok(NULL, delimiter);
+    }
+    while (index < 16) {
+        tokens[index] = NULL;
+        index++;
+    }
 }
 
 /**
  * @param: cmdString --- user command
  * @return: exitStatus --- check if this function exits corretlly
- * @author: Zhengyu Wu
+ * @author: Zhengyu Wu, Aksh
  * @version: 2020.10.13 last edited
  * This function usese fork+exec+wait method to implement the system()
  */
-int sshellSystem(char* cmdString){
+int sshellSystem(Command* com){
         pid_t pid;
-        char *args[] = {"sh","-c",cmdString, NULL}; 
+        // char *args[] = {"sh","-c",cmdString, NULL}; 
         int exitStatus;
 
         pid = fork();
 
         if(pid == 0){
-                execvp(args[0], args);
+                // Child
+                execvp(com->cmd, com->args);
                 perror("execvp");
                 exit(1);
         }else if(pid > 0){
+                // Parent
                 int status;
                 waitpid(pid, &status, 0);
                 exitStatus = WEXITSTATUS(status);
         }else{
+                // Fork error
                 perror("fork");
                 exit(1);
         }
@@ -153,16 +161,30 @@ int main(void)
                 /* Regular command */
                 // retval = system(cmd);
 
-                command* com = NULL;
-                char *newCmd = split_command(com, cmd);
-                
-                
-                retval = sshellSystem(newCmd);
-                
+                char** tokens = malloc(16 * sizeof(char*)); // Prompt: maximum # of arguments is 16. So with the command, its 17.
+                for (int i = 0; i < 17; i++) {
+                    tokens[i] = malloc(32 * sizeof(char)); // Prompt: max length of individual tokens is 32
+                }
+
+                tokenizer(tokens, cmd);
+                Command* com = NULL;
+                com = malloc(sizeof(Command));
+                com->cmd = malloc(32 * sizeof(char));
+                com->args = malloc(16 * sizeof(char*));
+                for (int i = 0; i < 16; i++) {
+                    com->args[i] = malloc(32 * sizeof(char));
+                }
+
+
+
+                split_command(tokens, com);
+                retval = sshellSystem(com);
                 print_completation(cmdCopy,retval);
+                
+                
                 // Free the memorry
                 free(com); 
-                free(newCmd);
+                free(tokens);
                 free(cmdCopy);
         }
 
