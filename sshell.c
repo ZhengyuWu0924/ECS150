@@ -4,17 +4,27 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 #define CMDLINE_MAX 512
+
+int isRedirection(char* cmdString) {
+    if (strchr(cmdString, '>') == NULL) {
+        return 0;
+    }
+    return 1;
+}
 
 /**
  * @param: args[x][y] -- variable to store the command after spliting
  * @author: Zhengyu Wu, Akash
  * This struct will store the arguments generated from user command
+ * It will also store the filename incase there is redirection
  */
 typedef struct{
     char* cmd;
     char** args;
+    char* filename;
 }Command;
 
 /**
@@ -23,72 +33,155 @@ typedef struct{
  * @return: cmdStr --- a char* variable that store the generated user commnad (new command)
  * @author: Zhengyu Wu, Akash
  * @version: 2020.10.15 20:45 last edited.
- * This function will be called in main(), then make an array to store all non-empty arguments in a 
+ * This function will be called in main(), then make an array to store all non-empty arguments in a
  * user command line.
  * Example: user input: "echo hello | date" will be generated as
  * "echo", "hello", "|", "date".
- * 
+ *
  */
-void split_command(char** tokens, Command* com) {
-    int index = 0;
 
-    // Copy command into cmd first
-    if (tokens[index] != NULL) {
-        strcpy(com->cmd, tokens[index]);
-    }
-    index++;
+void split_command(char* cmdString, Command* com) {
+    char* commandline = malloc(512 * sizeof(char));
+    strcpy(commandline, cmdString);
+    char* checkRedirection = malloc(512 * sizeof(char));
+    strcpy(checkRedirection, cmdString);
 
-    while (tokens[index] != NULL){
-        strcpy(com->args[index], tokens[index]);
-        index++;
-    }
-    while (index < 16) {
-        com->args[index] = NULL;
-        index++;
-    }
-}
-
-
-void tokenizer(char** tokens, char* cmdString) {
-    // We can assume that the command and arguments will be separated by a whitespace.
-
-    char* delimiter = " ";
+    char* redirectionDelimiter = ">>";
+    char* spaceDelimiter = " ";
     char* string;
+    char* beforeRedirection;
+    char* afterRedirection;
 
-    string = strtok(cmdString, delimiter);
+    if (isRedirection(checkRedirection)) { // Redirection is present
+        beforeRedirection = strtok(commandline, redirectionDelimiter);
+        afterRedirection = strtok(NULL, redirectionDelimiter);
+        afterRedirection = strtok(afterRedirection, spaceDelimiter); // removes leading whitespace after '>' operator
 
-    // Keep strtok'ing until we get a NULL value
-    int index = 0;
-    while (string != NULL) {
-        strcpy(tokens[index], string);
-        index++;
-        string = strtok(NULL, delimiter);
+        if (afterRedirection == NULL) { // Error management
+            com->filename = NULL;
+        } else {
+            strcpy(com->filename, afterRedirection);
+        }
+
+        int index = 0;
+        string = strtok(beforeRedirection, spaceDelimiter);
+        if (string != NULL) {
+            strcpy(com->cmd, string);
+        }
+
+        while (string != NULL) {
+            strcpy(com->args[index], string);
+            string = strtok(NULL, spaceDelimiter);
+            index++;
+        }
+        while (index < 16) {
+            com->args[index] = NULL;
+            index++;
+        }
     }
-    while (index < 16) {
-        tokens[index] = NULL;
-        index++;
+    else { // NO redirection
+        int index = 0;
+        string = strtok(cmdString, spaceDelimiter);
+        if (string != NULL) {
+            strcpy(com->cmd, string);
+        }
+
+        while (string != NULL) {
+            strcpy(com->args[index], string);
+            string = strtok(NULL, spaceDelimiter);
+            index++;
+        }
+        while (index < 16) {
+            com->args[index] = NULL;
+            index++;
+        }
     }
+    free(commandline);
+    free(checkRedirection);
 }
+
+// void split_command(char** tokens, Command* com) {
+//     int index = 0;
+//
+//     // Copy command into cmd first
+//     if (tokens[index] != NULL) {
+//         strcpy(com->cmd, tokens[index]);
+//     }
+//     index++;
+//
+//     while (tokens[index] != NULL){
+//         strcpy(com->args[index], tokens[index]);
+//         index++;
+//     }
+//     while (index < 16) {
+//         com->args[index] = NULL;
+//         index++;
+//     }
+// }
+//
+//
+// void tokenizer(char** tokens, char* cmdString) {
+//     // We can assume that the command and arguments will be separated by a whitespace.
+//
+//     char* delimiter = " ";
+//     char* string;
+//
+//     string = strtok(cmdString, delimiter);
+//
+//     // Keep strtok'ing until we get a NULL value
+//     int index = 0;
+//     while (string != NULL) {
+//         strcpy(tokens[index], string);
+//         index++;
+//         string = strtok(NULL, delimiter);
+//     }
+//     while (index < 16) {
+//         tokens[index] = NULL;
+//         index++;
+//     }
+// }
 
 /**
- * @param: cmdString --- user command
+ * @param: com --- struct that has command and arguments
+ * @param: redirectionFlag --- if commandline has redirection, it is set to 1
  * @return: exitStatus --- check if this function exits corretlly
  * @author: Zhengyu Wu, Aksh
  * @version: 2020.10.13 last edited
- * This function usese fork+exec+wait method to implement the system()
+ * This function uses fork+exec+wait method to implement the system()
  */
-int sshellSystem(Command* com){
+int sshellSystem(Command* com, int redirectionFlag){
         pid_t pid;
-        // char *args[] = {"sh","-c",cmdString, NULL}; 
+        // char *args[] = {"sh","-c",cmdString, NULL};
         int exitStatus;
 
         pid = fork();
 
         if(pid == 0){
                 // Child
-                execvp(com->cmd, com->args);
-                perror("execvp");
-                exit(1);
+                if (redirectionFlag) { // If there is redirection
+
+                    if (com->filename == NULL) {
+                        fprintf(stderr, "Error: no output file\n");
+                        exit(1);
+                    }
+
+                    int fd;
+                    fd = open(com->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                    if (fd == -1) {
+                        fprintf(stderr, "Error: cannot open output file\n");
+                        exit(1);
+                    }
+                    dup2(fd, STDOUT_FILENO);
+                    close(fd);
+                    execvp(com->cmd, com->args);
+                    perror("execvp");
+                    exit(1);
+                } else { // No redirection
+                    execvp(com->cmd, com->args);
+                    perror("execvp");
+                    exit(1);
+                }
+
         }else if(pid > 0){
                 // Parent
                 int status;
@@ -109,7 +202,7 @@ int sshellSystem(Command* com){
  *      'no argument for exit'
  */
 
-int builtin_exit(Command* com){
+int builtin_exit(){
         fprintf(stderr, "Bye...\n");
         return 0;
 }
@@ -117,7 +210,7 @@ int builtin_exit(Command* com){
  *      Built-in Command --- 'cd'
  *      Change working directory to the directory user enter
  *      'exactly one argument for cd'
- */ 
+ */
 int builtin_cd(Command* com){
         // Assume exactly one argument for cd
         chdir(com->args[1]);
@@ -129,7 +222,7 @@ int builtin_cd(Command* com){
  *      Print out current working directory
  *      'no argument for pwd'
  */
-int builtin_pwd(Command* com, char* workingDirectory){
+int builtin_pwd(char* workingDirectory){
         fprintf(stderr, "%s\n", workingDirectory);
         return 0;
 }
@@ -155,7 +248,7 @@ int main(void)
         while (1) {
                 char *nl;
                 int retval;
-                
+
 
                 /* Print prompt */
                 /* Follow assignment instruction
@@ -189,12 +282,6 @@ int main(void)
                 /* Regular command */
                 // retval = system(cmd);
 
-                char** tokens = malloc(16 * sizeof(char*)); // Prompt: maximum # of arguments is 16. So with the command, its 17.
-                for (int i = 0; i < 17; i++) {
-                    tokens[i] = malloc(32 * sizeof(char)); // Prompt: max length of individual tokens is 32
-                }
-
-                tokenizer(tokens, cmd);
                 Command* com = NULL;
                 com = malloc(sizeof(Command));
                 com->cmd = malloc(32 * sizeof(char));
@@ -202,34 +289,42 @@ int main(void)
                 for (int i = 0; i < 16; i++) {
                     com->args[i] = malloc(32 * sizeof(char));
                 }
+                com->filename = malloc(32 * sizeof(char));
 
-                split_command(tokens, com);
-                
+                split_command(cmdCopy, com);
+
+                int redirectionFlag = 0;
+                if (isRedirection(cmdCopy)) {
+                    redirectionFlag = 1;
+                }
+
                 if (!strcmp(com->cmd, "exit")) {
                         /* Builtin command */
                         // Exit command --- 'exit'
-                        retval = builtin_exit(com);
-                        print_completation(cmdCopy, retval);
+                        retval = builtin_exit();
+                        print_completation(cmd, retval);
                         break;
                 }else if(!strcmp(com->cmd, "cd")){
                         // Change directory --- 'cd'
                         retval = builtin_cd(com);
-                        print_completation(cmdCopy, retval);
+                        print_completation(cmd, retval);
                 }else if(!strcmp(com->cmd, "pwd")){
                         // Print working directory command --- 'pwd'
                         char working_dir[80];
                         getcwd(working_dir, sizeof(working_dir));
-                        retval = builtin_pwd(com, working_dir);
-                        print_completation(cmdCopy,retval);
-                        
+                        retval = builtin_pwd(working_dir);
+                        print_completation(cmd,retval);
+
                 }else{
-                        retval = sshellSystem(com);
-                        print_completation(cmdCopy,retval);
+                        retval = sshellSystem(com, redirectionFlag);
+                        // If retval returns 1, it means there was error
+                        if (retval == 0) { // If there was no error
+                            print_completation(cmd,retval);
+                        }
                 }
 
                 // Free the memorry
-                free(com); 
-                free(tokens);
+                free(com);
                 free(cmdCopy);
         }
 
