@@ -133,6 +133,7 @@ void split_pipe(char* cmdString, Pipecmd *pipe){
         char* pipeDelimiter = "|";
         char* spaceDelimiter = " ";
         char* string;
+        char* emptyString = " ";
 
         char* pipe1Str = malloc(32 * sizeof(char));
         char* pipe2Str = malloc(32 * sizeof(char));
@@ -152,7 +153,6 @@ void split_pipe(char* cmdString, Pipecmd *pipe){
                 printf("second: %s\n", pipe2Str);
                 string = strtok(NULL, pipeDelimiter);
                 pipe_index++;
-                string = strtok(NULL, pipeDelimiter); 
         }
         while(string != NULL){
                 if(pipe_index == 2){
@@ -160,33 +160,49 @@ void split_pipe(char* cmdString, Pipecmd *pipe){
                         printf("third: %s\n", pipe3Str);
                         pipe_index++;
                         has3rdStr = 1;
-                        
+                        string =strtok(NULL, pipeDelimiter);
+                        if(string == NULL){
+                                break;
+                        }
+                              
                 }
                 if(pipe_index == 3){
+                        // string =strtok(NULL, pipeDelimiter);
                         strcpy(pipe4Str, string);
                         printf("fouth: %s\n", pipe4Str);
                         has4thStr = 1;
+                        break;
                 }
-                // if(pipe_index == 3){
-                //         strcpy(pipe4Str, string);
-                //         printf("fouth: %s\n", pipe4Str);
-                // }
-                string =strtok(NULL, pipeDelimiter);
+                
+                
+                
+                
                 
         }
         split_command(pipe1Str, pipe->pipe1);
         printf("first command: %s\n", pipe->pipe1->cmd);
-        split_command(pipe2Str, pipe->pipe2);
-        printf("second command: %s\n", pipe->pipe2->cmd);
-
-        if(has3rdStr == 1){
-                split_command(pipe3Str, pipe->pipe3);
+        if(has3rdStr == 0){
+                split_command_redirection(pipe2Str, pipe->pipe2);
+                printf("second command: %s\n", pipe->pipe2->cmd);
+                printf("second is the end\n");
+        }
+        if(has4thStr == 0 && has3rdStr == 1){
+                split_command(pipe2Str, pipe->pipe2);
+                printf("second command: %s\n", pipe->pipe2->cmd);
+                split_command_redirection(pipe3Str, pipe->pipe3);
                 printf("third command: %s\n", pipe->pipe3->cmd);
+                printf("third is the end\n");
         }
         if(has4thStr == 1){
-                split_command(pipe4Str, pipe->pipe4);
+                split_command(pipe2Str, pipe->pipe2);
+                printf("second command: %s\n", pipe->pipe2->cmd);
+                split_command(pipe3Str, pipe->pipe3);
+                printf("third command: %s\n", pipe->pipe3->cmd);
+                split_command_redirection(pipe4Str, pipe->pipe4);
                 printf("fouth command: %s\n", pipe->pipe4->cmd);
+                printf("fouth is the end\n");
         }
+
         free(commandline);
         free(pipe1Str);
         free(pipe2Str);
