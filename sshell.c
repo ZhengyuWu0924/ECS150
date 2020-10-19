@@ -8,147 +8,192 @@
 
 #define CMDLINE_MAX 512
 
-int isRedirection(char* cmdString) {
-    if (strchr(cmdString, '>') == NULL) {
-        return 0;
-    }
-    return 1;
-}
+//Global Variable
+int pipe_index = 0;
 
-/**
- * @param: args[x][y] -- variable to store the command after spliting
- * @author: Zhengyu Wu, Akash
- * This struct will store the arguments generated from user command
- * It will also store the filename incase there is redirection
- */
 typedef struct{
     char* cmd;
     char** args;
     char* filename;
 }Command;
 
-/**
- * @param: com --- command structur variable to store the user command splitted by stytok()
- * @param: cmdString --- original user command;
- * @return: cmdStr --- a char* variable that store the generated user commnad (new command)
- * @author: Zhengyu Wu, Akash
- * @version: 2020.10.15 20:45 last edited.
- * This function will be called in main(), then make an array to store all non-empty arguments in a
- * user command line.
- * Example: user input: "echo hello | date" will be generated as
- * "echo", "hello", "|", "date".
- *
- */
+typedef struct{
+        Command *pipe1;
+        Command *pipe2;
+        Command *pipe3;
+        Command *pipe4;
+}Pipecmd;
 
-void split_command(char* cmdString, Command* com) {
-    char* commandline = malloc(512 * sizeof(char));
-    strcpy(commandline, cmdString);
-    char* checkRedirection = malloc(512 * sizeof(char));
-    strcpy(checkRedirection, cmdString);
-
-    char* redirectionDelimiter = ">>";
-    char* spaceDelimiter = " ";
-    char* string;
-    char* beforeRedirection;
-    char* afterRedirection;
-
-    if (isRedirection(checkRedirection)) { // Redirection is present
-        beforeRedirection = strtok(commandline, redirectionDelimiter);
-        afterRedirection = strtok(NULL, redirectionDelimiter);
-        afterRedirection = strtok(afterRedirection, spaceDelimiter); // removes leading whitespace after '>' operator
-
-        if (afterRedirection == NULL) { // Error management
-            com->filename = NULL;
-        } else {
-            strcpy(com->filename, afterRedirection);
+int isRedirection(char* cmdString) {
+        if (strchr(cmdString, '>') == NULL) {
+                return 0;
         }
+        return 1;
+}
 
-        int index = 0;
-        string = strtok(beforeRedirection, spaceDelimiter);
-        if (string != NULL) {
-            strcpy(com->cmd, string);
+int isPipe(char* cmdString){
+        if(strchr(cmdString, '|') == NULL){
+                //There is not even one pipe sign in command
+                return 0;
         }
+        return 1;
+}
 
-        while (string != NULL) {
-            strcpy(com->args[index], string);
-            string = strtok(NULL, spaceDelimiter);
-            index++;
-        }
-        while (index < 16) {
-            com->args[index] = NULL;
-            index++;
-        }
-    }
-    else { // NO redirection
+void split_command(char* cmdString, Command* com){
+        char* commandline = malloc(512 * sizeof(char));
+        strcpy(commandline, cmdString);
+        
+        char* spaceDelimiter = " ";
+        char* string;
+
         int index = 0;
         string = strtok(cmdString, spaceDelimiter);
         if (string != NULL) {
-            strcpy(com->cmd, string);
+                strcpy(com->cmd, string);
         }
 
         while (string != NULL) {
-            strcpy(com->args[index], string);
-            string = strtok(NULL, spaceDelimiter);
-            index++;
+                strcpy(com->args[index], string);
+                string = strtok(NULL, spaceDelimiter);
+                index++;
         }
         while (index < 16) {
-            com->args[index] = NULL;
-            index++;
+                com->args[index] = NULL;
+                index++;
         }
-    }
-    free(commandline);
-    free(checkRedirection);
+        free(commandline);
 }
 
-// void split_command(char** tokens, Command* com) {
-//     int index = 0;
-//
-//     // Copy command into cmd first
-//     if (tokens[index] != NULL) {
-//         strcpy(com->cmd, tokens[index]);
-//     }
-//     index++;
-//
-//     while (tokens[index] != NULL){
-//         strcpy(com->args[index], tokens[index]);
-//         index++;
-//     }
-//     while (index < 16) {
-//         com->args[index] = NULL;
-//         index++;
-//     }
-// }
-//
-//
-// void tokenizer(char** tokens, char* cmdString) {
-//     // We can assume that the command and arguments will be separated by a whitespace.
-//
-//     char* delimiter = " ";
-//     char* string;
-//
-//     string = strtok(cmdString, delimiter);
-//
-//     // Keep strtok'ing until we get a NULL value
-//     int index = 0;
-//     while (string != NULL) {
-//         strcpy(tokens[index], string);
-//         index++;
-//         string = strtok(NULL, delimiter);
-//     }
-//     while (index < 16) {
-//         tokens[index] = NULL;
-//         index++;
-//     }
-// }
+void split_command_redirection(char* cmdString, Command* com) {
 
-/**
- * @param: com --- struct that has command and arguments
- * @param: redirectionFlag --- if commandline has redirection, it is set to 1
- * @return: exitStatus --- check if this function exits corretlly
- * @author: Zhengyu Wu, Aksh
- * @version: 2020.10.13 last edited
- * This function uses fork+exec+wait method to implement the system()
- */
+        char* commandline = malloc(512 * sizeof(char));
+        strcpy(commandline, cmdString);
+        char* checkRedirection = malloc(512 * sizeof(char));
+        strcpy(checkRedirection, cmdString);
+
+        
+        
+        char* redirectionDelimiter = ">>";
+        char* spaceDelimiter = " ";
+        char* string;
+        char* beforeRedirection;
+        char* afterRedirection;
+
+        if (isRedirection(checkRedirection)) { // Redirection is present
+                beforeRedirection = strtok(commandline, redirectionDelimiter);
+                afterRedirection = strtok(NULL, redirectionDelimiter);
+                afterRedirection = strtok(afterRedirection, spaceDelimiter); // removes leading whitespace after '>' operator
+
+                if (afterRedirection == NULL) { // Error management
+                        com->filename = NULL;
+                } else {
+                strcpy(com->filename, afterRedirection);
+                }
+
+                int index = 0;
+                string = strtok(beforeRedirection, spaceDelimiter);
+                if (string != NULL) {
+                        strcpy(com->cmd, string);
+                }
+
+                while (string != NULL) {
+                        strcpy(com->args[index], string);
+                        string = strtok(NULL, spaceDelimiter);
+                        index++;
+                }
+                while (index < 16) {
+                        com->args[index] = NULL;
+                        index++;
+                }
+        } else { // NO redirection
+                int index = 0;
+                string = strtok(cmdString, spaceDelimiter);
+                if (string != NULL) {
+                        strcpy(com->cmd, string);
+                }
+
+                while (string != NULL) {
+                        strcpy(com->args[index], string);
+                        string = strtok(NULL, spaceDelimiter);
+                        index++;
+                }
+                while (index < 16) {
+                        com->args[index] = NULL;
+                        index++;
+                }
+         }
+        free(commandline);
+        free(checkRedirection);
+}
+
+void split_pipe(char* cmdString, Pipecmd *pipe){
+        char* commandline = malloc(512 * sizeof(char));
+        strcpy(commandline, cmdString);
+
+        char* pipeDelimiter = "|";
+        char* spaceDelimiter = " ";
+        char* string;
+
+        char* pipe1Str = malloc(32 * sizeof(char));
+        char* pipe2Str = malloc(32 * sizeof(char));
+        char* pipe3Str = malloc(32 * sizeof(char));
+        char* pipe4Str = malloc(32 * sizeof(char));
+
+        int has3rdStr = 0;
+        int has4thStr = 0;
+
+        string = strtok(commandline, pipeDelimiter);
+        if(string != NULL){
+                strcpy(pipe1Str, string);
+                printf("first: %s\n", pipe1Str);
+                pipe_index++;
+                string = strtok(NULL, pipeDelimiter);
+                strcpy(pipe2Str, string);
+                printf("second: %s\n", pipe2Str);
+                string = strtok(NULL, pipeDelimiter);
+                pipe_index++;
+                string = strtok(NULL, pipeDelimiter); 
+        }
+        while(string != NULL){
+                if(pipe_index == 2){
+                        strcpy(pipe3Str, string);
+                        printf("third: %s\n", pipe3Str);
+                        pipe_index++;
+                        has3rdStr = 1;
+                        
+                }
+                if(pipe_index == 3){
+                        strcpy(pipe4Str, string);
+                        printf("fouth: %s\n", pipe4Str);
+                        has4thStr = 1;
+                }
+                // if(pipe_index == 3){
+                //         strcpy(pipe4Str, string);
+                //         printf("fouth: %s\n", pipe4Str);
+                // }
+                string =strtok(NULL, pipeDelimiter);
+                
+        }
+        split_command(pipe1Str, pipe->pipe1);
+        printf("first command: %s\n", pipe->pipe1->cmd);
+        split_command(pipe2Str, pipe->pipe2);
+        printf("second command: %s\n", pipe->pipe2->cmd);
+
+        if(has3rdStr == 1){
+                split_command(pipe3Str, pipe->pipe3);
+                printf("third command: %s\n", pipe->pipe3->cmd);
+        }
+        if(has4thStr == 1){
+                split_command(pipe4Str, pipe->pipe4);
+                printf("fouth command: %s\n", pipe->pipe4->cmd);
+        }
+        free(commandline);
+        free(pipe1Str);
+        free(pipe2Str);
+        free(pipe3Str);
+        free(pipe4Str);
+}
+
 int sshellSystem(Command* com, int redirectionFlag){
         pid_t pid;
         // char *args[] = {"sh","-c",cmdString, NULL};
@@ -194,48 +239,26 @@ int sshellSystem(Command* com, int redirectionFlag){
         }
         return exitStatus;
 }
-/**
- *      Built-in Command --- 'exit'
- *      Moved from main() (skeleton code given by professor)
- *      As assignment prompy mentioned, this command will never be called
- *      with incorrect argument.
- *      'no argument for exit'
- */
 
 int builtin_exit(){
         fprintf(stderr, "Bye...\n");
         return 0;
 }
-/**
- *      Built-in Command --- 'cd'
- *      Change working directory to the directory user enter
- *      'exactly one argument for cd'
- */
+
 int builtin_cd(Command* com){
         // Assume exactly one argument for cd
         chdir(com->args[1]);
         return 0;
 
 }
-/**
- *      Built-in Command --- 'pwd'
- *      Print out current working directory
- *      'no argument for pwd'
- */
+
 int builtin_pwd(char* workingDirectory){
         fprintf(stderr, "%s\n", workingDirectory);
         return 0;
 }
 
 
-/**
-    @param: cmdCopy --- a copy of user cmd
-    @param: returnVal --- value return from sshellsystem, the fork+exec+wait method
-    @author: Zhengyu Wu
-    @version: 2020.10.14 last edited
-    This Function will take the cmd ented by user, then make a copy
-    It will allows the program to print out the original cmd in each completation message.
-*/
+
 void print_completation(char* cmdCopy, int returnVal){
         fprintf(stderr, "+ completed '%s': [%d]\n",
                         cmdCopy, returnVal);
@@ -286,17 +309,76 @@ int main(void)
                 com = malloc(sizeof(Command));
                 com->cmd = malloc(32 * sizeof(char));
                 com->args = malloc(16 * sizeof(char*));
+
+                
                 for (int i = 0; i < 16; i++) {
                     com->args[i] = malloc(32 * sizeof(char));
                 }
                 com->filename = malloc(32 * sizeof(char));
 
-                split_command(cmdCopy, com);
-
-                int redirectionFlag = 0;
-                if (isRedirection(cmdCopy)) {
-                    redirectionFlag = 1;
+                Pipecmd* pipe = NULL;
+                pipe = malloc(sizeof(Pipecmd));
+                pipe->pipe1 = malloc(sizeof(Command));
+                pipe->pipe1->cmd = malloc(32 * sizeof(char));
+                pipe->pipe1->args = malloc(16 * sizeof(char*));
+                for (int i = 0; i < 16; i++) {
+                    pipe->pipe1->args[i] = malloc(32 * sizeof(char));
                 }
+
+
+                pipe->pipe2 = malloc(sizeof(Command));
+                pipe->pipe2->cmd = malloc(32 * sizeof(char));
+                pipe->pipe2->args = malloc(16 * sizeof(char*));
+                for (int i = 0; i < 16; i++) {
+                    pipe->pipe2->args[i] = malloc(32 * sizeof(char));
+                }
+
+                pipe->pipe3 = malloc(sizeof(Command));
+                pipe->pipe3->cmd = malloc(32 * sizeof(char));
+                pipe->pipe3->args = malloc(16 * sizeof(char*));
+                for (int i = 0; i < 16; i++) {
+                    pipe->pipe3->args[i] = malloc(32 * sizeof(char));
+                }
+
+                pipe->pipe4 = malloc(sizeof(Command));
+                pipe->pipe4->cmd = malloc(32 * sizeof(char));
+                pipe->pipe4->args = malloc(16 * sizeof(char*));
+                for (int i = 0; i < 16; i++) {
+                    pipe->pipe4->args[i] = malloc(32 * sizeof(char));
+                }
+                
+                int redirectionFlag = 0;
+                if(isRedirection(cmdCopy)){
+                        redirectionFlag = 1;
+                }
+
+                int pipeFlag = 0;
+                if(isPipe(cmdCopy)){
+                        pipeFlag = 1;
+                }
+                
+                if(pipeFlag == 1){
+                        split_pipe(cmdCopy, pipe);
+                } else if(redirectionFlag == 1 && pipeFlag == 0){
+                        split_command_redirection(cmdCopy, com);
+                } else if(pipeFlag == 0 && redirectionFlag == 0){
+                        split_command(cmdCopy, com);
+                }
+
+                // int redirectionFlag = 0;
+                // if (isRedirection(cmdCopy)) {
+                //         redirectionFlag = 1;
+                //         split_command_redirection(cmdCopy, com);
+                // }
+                
+                // else{
+                //         split_command(cmdCopy, com);
+                // }
+
+
+                
+
+                
 
                 if (!strcmp(com->cmd, "exit")) {
                         /* Builtin command */
@@ -326,6 +408,7 @@ int main(void)
                 // Free the memorry
                 free(com);
                 free(cmdCopy);
+                pipe_index = 0;
         }
 
         return EXIT_SUCCESS;
