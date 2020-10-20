@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #define CMDLINE_MAX 512
 
@@ -31,6 +33,20 @@ int isRedirection(char* cmdString) {
         return 1;
 }
 
+int isAppend(char* cmdString) {
+    char* found;
+    found = strchr(cmdString, '>');
+
+    if (found == NULL) {
+        return 0;
+    } else {
+        if (found[1] == '>') {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int isPipe(char* cmdString){
         if(strchr(cmdString, '|') == NULL){
                 //There is not even one pipe sign in command
@@ -42,7 +58,7 @@ int isPipe(char* cmdString){
 void split_command(char* cmdString, Command* com){
         char* commandline = malloc(512 * sizeof(char));
         strcpy(commandline, cmdString);
-        
+
         char* spaceDelimiter = " ";
         char* string;
 
@@ -70,8 +86,9 @@ void split_command_redirection(char* cmdString, Command* com) {
         strcpy(commandline, cmdString);
         char* checkRedirection = malloc(512 * sizeof(char));
         strcpy(checkRedirection, cmdString);
-        
-        
+
+
+
         char* redirectionDelimiter = ">>";
         char* spaceDelimiter = " ";
         char* string;
@@ -82,10 +99,11 @@ void split_command_redirection(char* cmdString, Command* com) {
                 beforeRedirection = strtok(commandline, redirectionDelimiter);
                 afterRedirection = strtok(NULL, redirectionDelimiter);
                 afterRedirection = strtok(afterRedirection, spaceDelimiter); // removes leading whitespace after '>' operator
+
                 if (afterRedirection == NULL) { // Error management
                         com->filename = NULL;
                 } else {
-                        strcpy(com->filename, afterRedirection);
+                strcpy(com->filename, afterRedirection);
                 }
 
                 int index = 0;
@@ -129,9 +147,7 @@ void split_pipe(char* cmdString, Pipecmd *pipe){
         strcpy(commandline, cmdString);
 
         char* pipeDelimiter = "|";
-        char* spaceDelimiter = " ";
         char* string;
-        char* emptyString = " ";
 
         char* pipe1Str = malloc(32 * sizeof(char));
         char* pipe2Str = malloc(32 * sizeof(char));
@@ -144,7 +160,7 @@ void split_pipe(char* cmdString, Pipecmd *pipe){
         string = strtok(commandline, pipeDelimiter);
         if(string != NULL){
                 strcpy(pipe1Str, string);
-                
+
                 string = strtok(NULL, pipeDelimiter);
                 strcpy(pipe2Str, string);
                 string = strtok(NULL, pipeDelimiter);
@@ -167,7 +183,7 @@ void split_pipe(char* cmdString, Pipecmd *pipe){
                         pipe_index++;
                         break;
                 }
-                  
+
         }
         split_command(pipe1Str, pipe->pipe1);
         if(has3rdStr == 0){
@@ -190,13 +206,13 @@ void split_pipe(char* cmdString, Pipecmd *pipe){
         free(pipe4Str);
 }
 
-int sshellSystem(Command* com, int redirectionFlag){
+int sshellSystem(Command* com, int redirectionFlag, int appendFlag){
         pid_t pid;
         // char *args[] = {"sh","-c",cmdString, NULL};
         int exitStatus;
 
         pid = fork();
-        
+
         if(pid == 0){
                 // Child
                 if (redirectionFlag) { // If there is redirection
@@ -207,7 +223,12 @@ int sshellSystem(Command* com, int redirectionFlag){
                     }
 
                     int fd;
-                    fd = open(com->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                    if (appendFlag) { // We have a >> in commandline. Append NOT truncate. Open file in append mode. Else, open in truncate mode.
+                        fd = open(com->filename, O_WRONLY | O_CREAT | O_APPEND, 0644);
+                    } else {
+                        fd = open(com->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                    }
+
                     if (fd == -1) {
                         fprintf(stderr, "Error: cannot open output file\n");
                         exit(1);
@@ -236,7 +257,7 @@ int sshellSystem(Command* com, int redirectionFlag){
         return exitStatus;
 }
 
-int* sshellSystem_pipe(Pipecmd* cmdPipe, int redirectionFlag){
+int* sshellSystem_pipe(Pipecmd* cmdPipe){
         pid_t pipe1Pid;
         pid_t pipe2Pid;
         pid_t pipe3Pid;
@@ -248,8 +269,8 @@ int* sshellSystem_pipe(Pipecmd* cmdPipe, int redirectionFlag){
 
         static int exitStatus[4];
         int totalPipeSiganl = pipe_index;
-        int index = 0;
         int status[4];
+
         if(totalPipeSiganl == 1){
                 pipe(first_fd);
 
@@ -267,39 +288,47 @@ int* sshellSystem_pipe(Pipecmd* cmdPipe, int redirectionFlag){
                 }
                 pipe2Pid = fork();
                 if(pipe2Pid == 0){
-                        if (redirectionFlag) { // If there is redirection
-                                close(first_fd[1]);
-                                dup2(first_fd[0], STDIN_FILENO);
-                                close(first_fd[0]);
+                        close(first_fd[1]); //close the  pipe output
+                        dup2(first_fd[0], STDIN_FILENO);
+                        close(first_fd[0]);
+                        execvp(cmdPipe->pipe2->cmd, cmdPipe->pipe2->args);
+                        perror("execvp");
+                        exit(1);
+                        // *****************************
+                        // ********Does not work on this way//
+                        // printf("redirection Test\n");
+                        // if (redirectionFlag) { // If there is redirection
 
-                                if (cmdPipe->pipe2->filename == NULL) {
-                                        fprintf(stderr, "Error: no output file\n");
-                                        exit(1);
-                                }
 
-                                int fdirection;
-                                fdirection = open(cmdPipe->pipe2->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-                                if (fdirection == -1) {
-                                        fprintf(stderr, "Error: cannot open output file\n");
-                                        exit(1);
-                                }
-                                dup2(fdirection, STDOUT_FILENO);
-                                close(fdirection);
-                                close(first_fd[1]);
-                                dup2(first_fd[0], STDIN_FILENO);
-                                close(first_fd[0]);
-                                execvp(cmdPipe->pipe2->cmd, cmdPipe->pipe2->args);
-                                perror("execvp");
-                                exit(1);
-                        } else { // No redirection
-                                close(first_fd[1]);
-                                dup2(first_fd[0], STDIN_FILENO);
-                                close(first_fd[0]);
-                                execvp(cmdPipe->pipe2->cmd, cmdPipe->pipe2->args);
-                                perror("execvp");
-                                exit(1);
-                        }
-                        
+                        //         if (cmdPipe->pipe2->filename == NULL) {
+                        //                 fprintf(stderr, "Error: no output file\n");
+                        //                 exit(1);
+                        //         }
+
+                        //         int fdirection;
+                        //         fdirection = open(cmdPipe->pipe2->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                        //         if (fdirection == -1) {
+                        //                 fprintf(stderr, "Error: cannot open output file\n");
+                        //                 exit(1);
+                        //         }
+                        //         dup2(fdirection, STDOUT_FILENO);
+                        //         close(fdirection);
+                        //         close(first_fd[1]);
+                        //         dup2(first_fd[0], STDIN_FILENO);
+                        //         close(first_fd[0]);
+                        //         execvp(cmdPipe->pipe2->cmd, cmdPipe->pipe2->args);
+                        //         perror("execvp");
+                        //         exit(1);
+                        // } else { // No redirection
+                        //         close(first_fd[1]);
+                        //         dup2(first_fd[0], STDIN_FILENO);
+                        //         close(first_fd[0]);
+                        //         execvp(cmdPipe->pipe2->cmd, cmdPipe->pipe2->args);
+                        //         perror("execvp");
+                        //         exit(1);
+                        // }
+                        //************************************
+
                 } else if (pipe2Pid != 0){
                         close(first_fd[0]); // Totally close the pipe
                         close(first_fd[1]); // Totally close the pipe
@@ -327,7 +356,7 @@ int* sshellSystem_pipe(Pipecmd* cmdPipe, int redirectionFlag){
                         waitpid(pipe1Pid, &status[0],0);
                         exitStatus[0] = WEXITSTATUS(status[0]);
                 }
-                
+
                 pipe2Pid = fork();
                 if(pipe2Pid == 0){
                         close(first_fd[1]);
@@ -350,45 +379,19 @@ int* sshellSystem_pipe(Pipecmd* cmdPipe, int redirectionFlag){
                 }
                 pipe3Pid = fork();
                 if(pipe3Pid == 0){
-                        if (redirectionFlag) { // If there is redirection
-                                close(second_fd[1]);
-                                dup2(second_fd[0], STDIN_FILENO);
-                                close(second_fd[0]);
-
-                                if (cmdPipe->pipe3->filename == NULL) {
-                                        fprintf(stderr, "Error: no output file\n");
-                                        exit(1);
-                                }
-
-                                int fdirection;
-                                fdirection = open(cmdPipe->pipe3->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-                                if (fdirection == -1) {
-                                        fprintf(stderr, "Error: cannot open output file\n");
-                                        exit(1);
-                                }
-                                dup2(fdirection, STDOUT_FILENO);
-                                close(fdirection);
-                                close(second_fd[1]);
-                                dup2(second_fd[0], STDIN_FILENO);
-                                close(second_fd[0]);
-                                execvp(cmdPipe->pipe3->cmd, cmdPipe->pipe3->args);
-                                perror("execvp");
-                                exit(1);
-                        } else { // No redirection
-                                close(second_fd[1]);
-                                dup2(second_fd[0], STDIN_FILENO);
-                                close(second_fd[0]);
-                                execvp(cmdPipe->pipe3->cmd, cmdPipe->pipe3->args);
-                                perror("execvp");
-                                exit(1);
-                        }
+                        close(second_fd[1]);
+                        dup2(second_fd[0], STDIN_FILENO);
+                        close(second_fd[0]);
+                        execvp(cmdPipe->pipe3->cmd, cmdPipe->pipe3->args);
+                        perror("execvp");
+                        exit(1);
                 }else if (pipe3Pid != 0){
                         close(second_fd[0]);
                         close(second_fd[1]);
                         waitpid(pipe3Pid, &status[2],0);
                         exitStatus[2] = WEXITSTATUS(status[2]);
                 }
-                
+
         } else if(totalPipeSiganl == 3){
                 pipe(first_fd);
                 pipe(second_fd);
@@ -411,7 +414,7 @@ int* sshellSystem_pipe(Pipecmd* cmdPipe, int redirectionFlag){
                         waitpid(pipe1Pid, &status[0],0);
                         exitStatus[0] = WEXITSTATUS(status[0]);
                 }
-                
+
                 pipe2Pid = fork();
                 if(pipe2Pid == 0){
                         close(first_fd[1]);
@@ -453,38 +456,12 @@ int* sshellSystem_pipe(Pipecmd* cmdPipe, int redirectionFlag){
                 }
                 pipe4Pid = fork();
                 if(pipe4Pid == 0){
-                        if (redirectionFlag) { // If there is redirection
-                                close(third_fd[1]);
-                                dup2(third_fd[0], STDIN_FILENO);
-                                close(third_fd[0]);
-
-                                if (cmdPipe->pipe4->filename == NULL) {
-                                        fprintf(stderr, "Error: no output file\n");
-                                        exit(1);
-                                }
-
-                                int fdirection;
-                                fdirection = open(cmdPipe->pipe4->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-                                if (fdirection == -1) {
-                                        fprintf(stderr, "Error: cannot open output file\n");
-                                        exit(1);
-                                }
-                                dup2(fdirection, STDOUT_FILENO);
-                                close(fdirection);
-                                close(third_fd[1]);
-                                dup2(third_fd[0], STDIN_FILENO);
-                                close(third_fd[0]);
-                                execvp(cmdPipe->pipe4->cmd, cmdPipe->pipe4->args);
-                                perror("execvp");
-                                exit(1);
-                        } else { // No redirection
-                                close(third_fd[1]);
-                                dup2(third_fd[0], STDIN_FILENO);
-                                close(third_fd[0]);
-                                execvp(cmdPipe->pipe4->cmd, cmdPipe->pipe4->args);
-                                perror("execvp");
-                                exit(1);
-                        }
+                        close(third_fd[1]);
+                        dup2(third_fd[0], STDIN_FILENO);
+                        close(third_fd[0]);
+                        execvp(cmdPipe->pipe4->cmd, cmdPipe->pipe4->args);
+                        perror("execvp");
+                        exit(1);
                 } else if(pipe4Pid != 0){
                         close(third_fd[0]);
                         close(third_fd[1]);
@@ -514,21 +491,42 @@ int builtin_pwd(char* workingDirectory){
         return 0;
 }
 
+int sls_command() {
+    DIR* dirp;
+    struct stat sb;
+    struct dirent* dp;
 
+    dirp = opendir(".");
+
+    if (dirp == NULL) {
+        printf("Error: cannot open directory\n");
+        return 1;
+    }
+
+    while ((dp = readdir(dirp)) != NULL) {
+        if (!strcmp(dp->d_name, ".") | !strcmp(dp->d_name, "..")) { // Ignore file names with . and ..
+            continue;
+        }
+        stat(dp->d_name, &sb);
+        printf("%s (", dp->d_name);
+        printf("%llu bytes)\n", (long long)sb.st_size);
+    }
+    return 0;
+}
 
 void print_completation(char* cmdCopy, int returnVal){
-        fprintf(stderr, "+ completed '%s': [%d]\n",
+        fprintf(stderr, "+ completed '%s' [%d]\n",
                         cmdCopy, returnVal);
 }
 void print_pipe_completation(char* cmdCopy, int* returnVal, int pipe_index){
         if(pipe_index == 1){
-                fprintf(stderr, "+ completed '%s': [%d][%d]\n",
+                fprintf(stderr, "+ completed '%s' [%d][%d]\n",
                         cmdCopy, returnVal[0], returnVal[1]);
         } else if(pipe_index == 2){
-                fprintf(stderr, "+ completed '%s': [%d][%d][%d]\n",
+                fprintf(stderr, "+ completed '%s' [%d][%d][%d]\n",
                         cmdCopy, returnVal[0], returnVal[1], returnVal[2]);
         } else if(pipe_index == 3){
-                fprintf(stderr, "+ completed '%s': [%d][%d][%d][%d]\n",
+                fprintf(stderr, "+ completed '%s' [%d][%d][%d][%d]\n",
                         cmdCopy, returnVal[0], returnVal[1], returnVal[2], returnVal[3]);
         }
 }
@@ -579,7 +577,7 @@ int main(void)
                 com->cmd = malloc(32 * sizeof(char));
                 com->args = malloc(16 * sizeof(char*));
 
-                
+
                 for (int i = 0; i < 16; i++) {
                     com->args[i] = malloc(32 * sizeof(char));
                 }
@@ -593,7 +591,6 @@ int main(void)
                 for (int i = 0; i < 16; i++) {
                     pipe->pipe1->args[i] = malloc(32 * sizeof(char));
                 }
-                pipe->pipe1->filename = malloc(32 * sizeof(char));
 
 
                 pipe->pipe2 = malloc(sizeof(Command));
@@ -602,7 +599,6 @@ int main(void)
                 for (int i = 0; i < 16; i++) {
                     pipe->pipe2->args[i] = malloc(32 * sizeof(char));
                 }
-                pipe->pipe2->filename = malloc(32 * sizeof(char));
 
                 pipe->pipe3 = malloc(sizeof(Command));
                 pipe->pipe3->cmd = malloc(32 * sizeof(char));
@@ -610,7 +606,6 @@ int main(void)
                 for (int i = 0; i < 16; i++) {
                     pipe->pipe3->args[i] = malloc(32 * sizeof(char));
                 }
-                pipe->pipe3->filename = malloc(32 * sizeof(char));
 
                 pipe->pipe4 = malloc(sizeof(Command));
                 pipe->pipe4->cmd = malloc(32 * sizeof(char));
@@ -618,18 +613,26 @@ int main(void)
                 for (int i = 0; i < 16; i++) {
                     pipe->pipe4->args[i] = malloc(32 * sizeof(char));
                 }
-                pipe->pipe4->filename = malloc(32 * sizeof(char));
-                
+
                 int redirectionFlag = 0;
                 if(isRedirection(cmdCopy)){
                         redirectionFlag = 1;
                 }
 
+                strcpy(cmdCopy, cmd); // Reset cmdCopy incase it was modified
+
+                int appendFlag = 0;
+                if (isAppend(cmdCopy)) {
+                    appendFlag = 1;
+                }
+
+                strcpy(cmdCopy, cmd); // Reset cmdCopy incase it was modified
+
                 int pipeFlag = 0;
                 if(isPipe(cmdCopy)){
                         pipeFlag = 1;
                 }
-                
+
                 if(pipeFlag == 1){
                         split_pipe(cmdCopy, pipe);
                 } else if(redirectionFlag == 1 && pipeFlag == 0){
@@ -657,20 +660,23 @@ int main(void)
                         retval = builtin_pwd(working_dir);
                         print_completation(cmd,retval);
 
+                }else if(!strcmp(com->cmd, "sls")) {
+                        retval = sls_command();
+                        print_completation(cmd, retval);
                 }else{
                         if(pipeFlag){
                                 int* retarr;
-                                retarr = sshellSystem_pipe(pipe, redirectionFlag);
+                                retarr = sshellSystem_pipe(pipe);
                                 print_pipe_completation(cmd, retarr, pipe_index);
                         } else {
-                                retval = sshellSystem(com, redirectionFlag);
+                                retval = sshellSystem(com, redirectionFlag, appendFlag);
                                 if (retval == 0) { // If there was no error
                                         print_completation(cmd,retval);
                         }
                         }
-                        
+
                         // If retval returns 1, it means there was error
-                        
+
                 }
 
                 // Free the memorry
