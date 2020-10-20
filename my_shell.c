@@ -216,6 +216,12 @@ int sls_command() {
     struct dirent* dp;
 
     dirp = opendir(".");
+
+    if (dirp == NULL) {
+        printf("Error: cannot open directory\n");
+        return 1;
+    }
+
     while ((dp = readdir(dirp)) != NULL) {
         if (!strcmp(dp->d_name, ".") | !strcmp(dp->d_name, "..")) { // Ignore file names with . and ..
             continue;
