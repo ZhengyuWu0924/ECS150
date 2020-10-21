@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #define CMDLINE_MAX 512
 
@@ -32,6 +34,20 @@ int isRedirection(char* cmdString) {
         return 1;
 }
 
+int isAppend(char* cmdString) {
+    char* found;
+    found = strchr(cmdString, '>');
+
+    if (found == NULL) {
+        return 0;
+    } else {
+        if (found[1] == '>') {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int isPipe(char* cmdString){
         if(strchr(cmdString, '|') == NULL){
                 //There is not even one pipe sign in command
@@ -39,10 +55,10 @@ int isPipe(char* cmdString){
         }
         return 1;
 }
-void split_command(char* cmdString, Command* com){
+int split_command(char* cmdString, Command* com){
         char* commandline = malloc(512 * sizeof(char));
         strcpy(commandline, cmdString);
-        
+
         char* spaceDelimiter = " ";
         char* string;
 
@@ -53,6 +69,10 @@ void split_command(char* cmdString, Command* com){
         }
 
         while (string != NULL) {
+                if (index >= 16) { // Too many arguments
+                    fprintf(stderr, "Error: too many process arguments\n");
+                    return 1;
+                }
                 strcpy(com->args[index], string);
                 string = strtok(NULL, spaceDelimiter);
                 index++;
@@ -62,24 +82,37 @@ void split_command(char* cmdString, Command* com){
                 index++;
         }
         free(commandline);
+        return 0;
 }
 
-void split_command_redirection(char* cmdString, Command* com) {
+int split_command_redirection(char* cmdString, Command* com) {
 
         char* commandline = malloc(512 * sizeof(char));
         strcpy(commandline, cmdString);
         char* checkRedirection = malloc(512 * sizeof(char));
         strcpy(checkRedirection, cmdString);
-        
-        
-        char* redirectionDelimiter = ">>";
+
+
+        char* redirectionDelimiter = ">";
         char* spaceDelimiter = " ";
         char* string;
         char* beforeRedirection;
         char* afterRedirection;
+        char* missingCommandCheck;
 
         if (isRedirection(checkRedirection)) { // Redirection is present
-                
+
+                // If the first thing on the command line is '>', then there's a command missing
+                missingCommandCheck = strtok(commandline, spaceDelimiter);
+                char check = missingCommandCheck[0];
+
+                if (check ==  '>') { // If the first thing is '>', return error
+                    fprintf(stderr, "Error: missing command\n");
+                    return 1;
+                }
+
+                strcpy(commandline, cmdString); // To reset commandline string incase it was modified previously
+
                 beforeRedirection = strtok(commandline, redirectionDelimiter);
                 afterRedirection = strtok(NULL, redirectionDelimiter);
                 afterRedirection = strtok(afterRedirection, spaceDelimiter); // removes leading whitespace after '>' operator
@@ -123,6 +156,7 @@ void split_command_redirection(char* cmdString, Command* com) {
          }
         free(commandline);
         free(checkRedirection);
+        return 0;
 }
 
 void split_pipe(char* cmdString, Pipecmd *pipe){
@@ -140,109 +174,96 @@ void split_pipe(char* cmdString, Pipecmd *pipe){
         int has3rdStr = 0;
         int has4thStr = 0;
         if(strncmp(cmdString, pipeDelimiter, 1) == 0){
-                strcpy(pipe->pipe1->cmd, "NULL");
-                strcpy(pipe->pipe2->cmd, "NULL");
+                pipe_index++;
+                strcpy(pipe->pipe1->cmd, "NULLPIPE");
+                return;
         } else {
                 string = strtok(commandline, pipeDelimiter);
                 if(string != NULL){
                         strcpy(pipe1Str, string);
+                        pipe_index++;
                         if(isRedirection(pipe1Str) == 1){
                                 mislocatedOut = 1;
                         }
                         if(strcmp(pipe1Str, " ") == 0){
-                                strcpy(pipe->pipe1->cmd, "NULL");
+                                strcpy(pipe->pipe1->cmd, "NULLPIPE");
                         }
                         string = strtok(NULL, pipeDelimiter);
                         if(string == NULL){
-                                strcpy(pipe->pipe2->cmd, "NULL");
-                                strcpy(pipe->pipe3->cmd, "NULL");
-                                strcpy(pipe->pipe4->cmd, "NULL");
+                                strcpy(pipe->pipe2->cmd, "NULLPIPE");
                         } else {
                                 strcpy(pipe2Str, string);
                                 if(strcmp(pipe2Str, " ") == 0){
-                                        strcpy(pipe->pipe2->cmd, "NULL");
+                                        strcpy(pipe->pipe2->cmd, "NULLPIPE");
                                 }
-                                
                                 string = strtok(NULL, pipeDelimiter);
-                                pipe_index++;
-                                
+
                         }
-                        
                 }
-                
-                while(string != NULL){
-                        if(pipe_index == 1){
-                                strcpy(pipe3Str, string);
-                                if(isRedirection(pipe1Str) == 1 || isRedirection(pipe2Str) == 1){
-                                        mislocatedOut = 1;
-                                        break;
-                                }
-                                if(strcmp(pipe3Str, " ") == 0){
-                                        strcpy(pipe->pipe3->cmd, "NULL");
-                                        break;
-                                } else {
-                                        pipe_index++;
-                                        has3rdStr = 1;
-                                        string =strtok(NULL, pipeDelimiter);
-                                        if(string == NULL){
-                                                strcpy(pipe->pipe4->cmd, "NULL");
-                                                break;
-                                        }
-                                }
-                                
-                        }
-                        if(pipe_index == 2){
-                                if(isRedirection(pipe1Str) == 1 || isRedirection(pipe2Str) == 1 || isRedirection(pipe3Str) == 1){
-                                        mislocatedOut = 1;
-                                        break;
-                                }
-                                strcpy(pipe4Str, string);
-                                if(strcmp(pipe4Str, " ") == 0){
-                                        strcpy(pipe->pipe4->cmd, "NULL");
-                                        break;
-                                } else {
-                                        has4thStr = 1;
-                                        pipe_index++;
-                                        break;
-                                }
-                                
-                        }
- 
-                }
-                split_command(pipe1Str, pipe->pipe1);
-                
-                // isMislocatedOutput(pipe1Cpy);
-                if(has3rdStr == 0){
-                        if(pipe2Str == NULL){
-                                fprintf(stderr, "Error\n");
-                                strcpy(pipe->pipe2->cmd, "NULL");
-                        } else {
-                                split_command_redirection(pipe2Str, pipe->pipe2);
-                        }
-                        
-                }
-                if(has4thStr == 0 && has3rdStr == 1){
-                        
-                        split_command(pipe2Str, pipe->pipe2);
-                        split_command_redirection(pipe3Str, pipe->pipe3);
-                        
-                        
-                }
-                
-                if(has4thStr == 1){
-                        split_command(pipe2Str, pipe->pipe2);
-                        split_command(pipe3Str, pipe->pipe3);
-                        split_command_redirection(pipe4Str, pipe->pipe4);
-                        
-                }
+
         }
 
-        // if (strlen(pipe1Str) == 0){
-        //                         fprintf(stderr, "Error: missing command");
-        // } else {
-        //         split_command(pipe1Str, pipe->pipe1);
-        // }
+        while(string != NULL){
+                if(pipe_index == 1){
+                        if(string == NULL){
+                                strcpy(pipe->pipe3->cmd, "NULLPIPE");
+                                break;
+                        }
+                        strcpy(pipe3Str, string);
+                        pipe_index++;
+                        if(isRedirection(pipe1Str) == 1 || isRedirection(pipe2Str) == 1){
+                                mislocatedOut = 1;
+                                break;
+                        }
+                        if(strcmp(pipe3Str, " ") == 0){
+                                strcpy(pipe->pipe3->cmd, "NULLPIPE");
+                                break;
+                        } else {
+                                has3rdStr = 1;
+                                string =strtok(NULL, pipeDelimiter);
+                                if(string == NULL){
+                                        strcpy(pipe->pipe4->cmd, "NULLPIPE");
+                                        break;
+                                }
+                        }
 
+                }
+                if(pipe_index == 2){
+                        pipe_index++;
+                        if(isRedirection(pipe1Str) == 1 || isRedirection(pipe2Str) == 1 || isRedirection(pipe3Str) == 1){
+                                mislocatedOut = 1;
+                                break;
+                        }
+                        strcpy(pipe4Str, string);
+                        if(strcmp(pipe4Str, " ") == 0){
+                                strcpy(pipe->pipe4->cmd, "NULLPIPE");
+                                break;
+                        } else {
+                                has4thStr = 1;
+                                break;
+                        }
+
+                }
+
+        }
+        split_command(pipe1Str, pipe->pipe1);
+
+        // isMislocatedOutput(pipe1Cpy);
+        if(has3rdStr == 0){
+                split_command_redirection(pipe2Str, pipe->pipe2);
+
+        }
+        if(has4thStr == 0 && has3rdStr == 1){
+                split_command(pipe2Str, pipe->pipe2);
+                split_command_redirection(pipe3Str, pipe->pipe3);
+        }
+
+        if(has4thStr == 1){
+                split_command(pipe2Str, pipe->pipe2);
+                split_command(pipe3Str, pipe->pipe3);
+                split_command_redirection(pipe4Str, pipe->pipe4);
+
+        }
 
         free(commandline);
         free(pipe1Str);
@@ -251,13 +272,13 @@ void split_pipe(char* cmdString, Pipecmd *pipe){
         free(pipe4Str);
 }
 
-int sshellSystem(Command* com, int redirectionFlag){
+int sshellSystem(Command* com, int redirectionFlag, int appendFlag){
         pid_t pid;
         // char *args[] = {"sh","-c",cmdString, NULL};
         int exitStatus;
 
         pid = fork();
-        
+
         if(pid == 0){
                 // Child
                 if (redirectionFlag) { // If there is redirection
@@ -268,7 +289,11 @@ int sshellSystem(Command* com, int redirectionFlag){
                     }
 
                     int fd;
-                    fd = open(com->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                    if (appendFlag) { // We have a >> in commandline. Append NOT truncate. Open file in append mode. Else, open in truncate mode.
+                        fd = open(com->filename, O_WRONLY | O_CREAT | O_APPEND, 0644);
+                    } else {
+                        fd = open(com->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                    }
                     if (fd == -1) {
                         fprintf(stderr, "Error: cannot open output file\n");
                         exit(1);
@@ -276,11 +301,11 @@ int sshellSystem(Command* com, int redirectionFlag){
                     dup2(fd, STDOUT_FILENO);
                     close(fd);
                     execvp(com->cmd, com->args);
-                    perror("execvp");
+                    fprintf(stderr, "Error: command not found\n");
                     exit(1);
                 } else { // No redirection
                     execvp(com->cmd, com->args);
-                    perror("execvp");
+                    fprintf(stderr, "Error: command not found\n");
                     exit(1);
                 }
 
@@ -362,9 +387,9 @@ int* sshellSystem_pipe(Pipecmd* cmdPipe, int redirectionFlag){
                                 perror("execvp");
                                 exit(1);
                         }
-                
 
-                        
+
+
                 } else if (pipe2Pid != 0){
                         close(first_fd[0]); // Totally close the pipe
                         close(first_fd[1]); // Totally close the pipe
@@ -392,7 +417,7 @@ int* sshellSystem_pipe(Pipecmd* cmdPipe, int redirectionFlag){
                         waitpid(pipe1Pid, &status[0],0);
                         exitStatus[0] = WEXITSTATUS(status[0]);
                 }
-                
+
                 pipe2Pid = fork();
                 if(pipe2Pid == 0){
                         close(first_fd[1]);
@@ -453,7 +478,7 @@ int* sshellSystem_pipe(Pipecmd* cmdPipe, int redirectionFlag){
                         waitpid(pipe3Pid, &status[2],0);
                         exitStatus[2] = WEXITSTATUS(status[2]);
                 }
-                
+
         } else if(totalPipeSiganl == 3){
                 pipe(first_fd);
                 pipe(second_fd);
@@ -476,7 +501,7 @@ int* sshellSystem_pipe(Pipecmd* cmdPipe, int redirectionFlag){
                         waitpid(pipe1Pid, &status[0],0);
                         exitStatus[0] = WEXITSTATUS(status[0]);
                 }
-                
+
                 pipe2Pid = fork();
                 if(pipe2Pid == 0){
                         close(first_fd[1]);
@@ -569,31 +594,58 @@ int builtin_exit(){
 
 int builtin_cd(Command* com){
         // Assume exactly one argument for cd
+        DIR* dirp;
+        dirp = opendir(com->args[1]);
+        if (dirp == NULL) {
+            fprintf(stderr, "Error: cannot cd into directory\n");
+            return 1;
+        }
         chdir(com->args[1]);
         return 0;
 
 }
 
 int builtin_pwd(char* workingDirectory){
-        fprintf(stderr, "%s\n", workingDirectory);
+        fprintf(stdout, "%s\n", workingDirectory);
         return 0;
 }
 
+int sls_command() {
+    DIR* dirp;
+    struct stat sb;
+    struct dirent* dp;
 
+    dirp = opendir(".");
+
+    if (dirp == NULL) {
+        printf("Error: cannot open directory\n");
+        return 1;
+    }
+
+    while ((dp = readdir(dirp)) != NULL) {
+        if (!strcmp(dp->d_name, ".") | !strcmp(dp->d_name, "..")) { // Ignore file names with . and ..
+            continue;
+        }
+        stat(dp->d_name, &sb);
+        printf("%s (", dp->d_name);
+        printf("%llu bytes)\n", (long long)sb.st_size);
+    }
+    return 0;
+}
 
 void print_completation(char* cmdCopy, int returnVal){
-        fprintf(stderr, "+ completed '%s': [%d]\n",
+        fprintf(stderr, "+ completed '%s' [%d]\n",
                         cmdCopy, returnVal);
 }
 void print_pipe_completation(char* cmdCopy, int* returnVal, int pipe_index){
         if(pipe_index == 1){
-                fprintf(stderr, "+ completed '%s': [%d][%d]\n",
+                fprintf(stderr, "+ completed '%s' [%d][%d]\n",
                         cmdCopy, returnVal[0], returnVal[1]);
         } else if(pipe_index == 2){
-                fprintf(stderr, "+ completed '%s': [%d][%d][%d]\n",
+                fprintf(stderr, "+ completed '%s' [%d][%d][%d]\n",
                         cmdCopy, returnVal[0], returnVal[1], returnVal[2]);
         } else if(pipe_index == 3){
-                fprintf(stderr, "+ completed '%s': [%d][%d][%d][%d]\n",
+                fprintf(stderr, "+ completed '%s' [%d][%d][%d][%d]\n",
                         cmdCopy, returnVal[0], returnVal[1], returnVal[2], returnVal[3]);
         }
 }
@@ -645,7 +697,7 @@ int main(void)
                 com->cmd = malloc(32 * sizeof(char));
                 com->args = malloc(16 * sizeof(char*));
 
-                
+
                 for (int i = 0; i < 16; i++) {
                     com->args[i] = malloc(32 * sizeof(char));
                 }
@@ -685,30 +737,76 @@ int main(void)
                     pipe->pipe4->args[i] = malloc(32 * sizeof(char));
                 }
                 pipe->pipe4->filename = malloc(32 * sizeof(char));
-                
+
                 int redirectionFlag = 0;
                 if(isRedirection(cmdCopy)){
                         redirectionFlag = 1;
                 }
 
+                strcpy(cmdCopy, cmd); // Reset cmdCopy incase it was modified
+
+                int appendFlag = 0;
+                if (isAppend(cmdCopy)) {
+                    appendFlag = 1;
+                }
+
+                strcpy(cmdCopy, cmd); // Reset cmdCopy incase it was modified
+
                 int pipeFlag = 0;
                 if(isPipe(cmdCopy)){
                         pipeFlag = 1;
                 }
-                
+
                 if(pipeFlag == 1){
                         split_pipe(cmdCopy, pipe);
                 } else if(redirectionFlag == 1 && pipeFlag == 0){
-                        split_command_redirection(cmdCopy, com);
+                        int success = split_command_redirection(cmdCopy, com);
+                        if (success == 1) {
+                            continue;
+                        }
                 } else if(pipeFlag == 0 && redirectionFlag == 0){
-                        split_command(cmdCopy, com);
+                        int success = split_command(cmdCopy, com); // If success is 0, its fine. If its 1, its BAD.
+                        if (success == 1) {
+                            continue;
+                        }
                 }
 
-                if(strcmp(pipe->pipe1->cmd, "NULL") == 0 || 
-                   strcmp(pipe->pipe2->cmd, "NULL") == 0 || 
-                   strcmp(pipe->pipe3->cmd, "NULL") == 0 ||
-                   strcmp(pipe->pipe4->cmd, "NULL") == 0 ||
-                   strcmp(com->cmd, "NULLCMD") == 0){
+                // if(strcmp(pipe->pipe1->cmd, "NULLPIPE") == 0 ||
+                //    strcmp(pipe->pipe2->cmd, "NULLPIPE") == 0 ||
+                //    strcmp(pipe->pipe3->cmd, "NULLPIPE") == 0 ||
+                //    strcmp(pipe->pipe4->cmd, "NULLPIPE") == 0 ){
+                //         fprintf(stderr, "Error: missing command\n");
+                //         continue;
+                // }
+
+                if(strcmp(pipe->pipe1->cmd, "NULLPIPE") == 0){
+                        fprintf(stderr, "Error: missing command\n");
+                        continue;
+                }
+                if(strcmp(pipe->pipe2->cmd, "NULLPIPE") == 0){
+                        fprintf(stderr, "Error: missing command\n");
+                        continue;
+                }
+                if(pipe_index == 2){
+                        if(strcmp(pipe->pipe1->cmd, "NULLPIPE") == 0 ||
+                           strcmp(pipe->pipe2->cmd, "NULLPIPE") == 0 ||
+                           strcmp(pipe->pipe3->cmd, "NULLPIPE") == 0){
+                                        fprintf(stderr, "Error: missing command\n");
+                                        continue;
+                           }
+                }
+                if(pipe_index == 3){
+                        if(strcmp(pipe->pipe1->cmd, "NULLPIPE") == 0 ||
+                           strcmp(pipe->pipe2->cmd, "NULLPIPE") == 0 ||
+                           strcmp(pipe->pipe3->cmd, "NULLPIPE") == 0 ||
+                           strcmp(pipe->pipe4->cmd, "NULLPIPE") == 0){
+                                        fprintf(stderr, "Error: missing command\n");
+                                        continue;
+                           }
+                }
+
+
+                if(strcmp(com->cmd, "NULLCMD") == 0){
                         fprintf(stderr, "Error: missing command\n");
                         continue;
                 }
@@ -718,16 +816,10 @@ int main(void)
                         continue;
                 }
 
-                
 
 
-                if (!strcmp(com->cmd, "exit")) {
-                        /* Builtin command */
-                        // Exit command --- 'exit'
-                        retval = builtin_exit();
-                        print_completation(cmd, retval);
-                        break;
-                }else if(!strcmp(com->cmd, "cd")){
+
+                if(!strcmp(com->cmd, "cd")){
                         // Change directory --- 'cd'
                         retval = builtin_cd(com);
                         print_completation(cmd, retval);
@@ -738,29 +830,38 @@ int main(void)
                         retval = builtin_pwd(working_dir);
                         print_completation(cmd,retval);
 
-                }else{
+                }else if (!strcmp(com->cmd, "exit")) {
+                        /* Builtin command */
+                        // Exit command --- 'exit'
+                        retval = builtin_exit();
+                        print_completation(cmd, retval);
+                        break;
+                }else if(!strcmp(com->cmd, "sls")) {
+                        retval = sls_command();
+                        print_completation(cmd, retval);
+                }else {
                         if(pipeFlag){
                                 int* retarr;
                                 retarr = sshellSystem_pipe(pipe, redirectionFlag);
                                 print_pipe_completation(cmd, retarr, pipe_index);
                         } else {
-                                retval = sshellSystem(com, redirectionFlag);
+                                retval = sshellSystem(com, redirectionFlag, appendFlag);
                                 if (retval == 0) { // If there was no error
                                         print_completation(cmd,retval);
                                 }
                         }
-                        
+
                         // If retval returns 1, it means there was error
-                        
+
                 }
 
                 // Free the memorry
                 free(com);
                 free(cmdCopy);
                 free(pipe);
-                
+
                 pipe_index = 0;
-                
+
         }
 
         return EXIT_SUCCESS;
