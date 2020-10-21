@@ -55,7 +55,7 @@ int isPipe(char* cmdString){
         return 1;
 }
 
-void split_command(char* cmdString, Command* com){
+int split_command(char* cmdString, Command* com){
         char* commandline = malloc(512 * sizeof(char));
         strcpy(commandline, cmdString);
 
@@ -69,6 +69,10 @@ void split_command(char* cmdString, Command* com){
         }
 
         while (string != NULL) {
+                if (index >= 16) { // Too many arguments
+                    fprintf(stderr, "Error: too many process arguments\n");
+                    return 1;
+                }
                 strcpy(com->args[index], string);
                 string = strtok(NULL, spaceDelimiter);
                 index++;
@@ -78,9 +82,10 @@ void split_command(char* cmdString, Command* com){
                 index++;
         }
         free(commandline);
+        return 0;
 }
 
-void split_command_redirection(char* cmdString, Command* com) {
+int split_command_redirection(char* cmdString, Command* com) {
 
         char* commandline = malloc(512 * sizeof(char));
         strcpy(commandline, cmdString);
@@ -89,16 +94,35 @@ void split_command_redirection(char* cmdString, Command* com) {
 
 
 
-        char* redirectionDelimiter = ">>";
+        char* redirectionDelimiter = ">";
         char* spaceDelimiter = " ";
         char* string;
         char* beforeRedirection;
         char* afterRedirection;
+        char* missingCommandCheck;
 
         if (isRedirection(checkRedirection)) { // Redirection is present
+
+                // If the first thing on the command line is '>', then there's a command missing
+                missingCommandCheck = strtok(commandline, spaceDelimiter);
+                char check = missingCommandCheck[0];
+
+                if (check ==  '>') { // If the first thing is '>', return error
+                    fprintf(stderr, "Error: missing command\n");
+                    return 1;
+                }
+
+                strcpy(commandline, cmdString); // To reset commandline string incase it was modified previously
+
                 beforeRedirection = strtok(commandline, redirectionDelimiter);
                 afterRedirection = strtok(NULL, redirectionDelimiter);
                 afterRedirection = strtok(afterRedirection, spaceDelimiter); // removes leading whitespace after '>' operator
+
+
+                // if (beforeRedirection[0] == '\0') {
+                //     fprintf(stderr, "Error: missing command");
+                //     return 1;
+                // }
 
                 if (afterRedirection == NULL) { // Error management
                         com->filename = NULL;
@@ -140,6 +164,7 @@ void split_command_redirection(char* cmdString, Command* com) {
          }
         free(commandline);
         free(checkRedirection);
+        return 0;
 }
 
 void split_pipe(char* cmdString, Pipecmd *pipe){
@@ -236,11 +261,11 @@ int sshellSystem(Command* com, int redirectionFlag, int appendFlag){
                     dup2(fd, STDOUT_FILENO);
                     close(fd);
                     execvp(com->cmd, com->args);
-                    perror("execvp");
+                    fprintf(stderr, "Error: command not found\n");
                     exit(1);
                 } else { // No redirection
                     execvp(com->cmd, com->args);
-                    perror("execvp");
+                    fprintf(stderr, "Error: command not found\n");
                     exit(1);
                 }
 
@@ -481,6 +506,12 @@ int builtin_exit(){
 
 int builtin_cd(Command* com){
         // Assume exactly one argument for cd
+        DIR* dirp;
+        dirp = opendir(com->args[1]);
+        if (dirp == NULL) {
+            fprintf(stderr, "Error: cannot cd into directory\n");
+            return 1;
+        }
         chdir(com->args[1]);
         return 0;
 
@@ -636,9 +667,15 @@ int main(void)
                 if(pipeFlag == 1){
                         split_pipe(cmdCopy, pipe);
                 } else if(redirectionFlag == 1 && pipeFlag == 0){
-                        split_command_redirection(cmdCopy, com);
+                        int success = split_command_redirection(cmdCopy, com);
+                        if (success == 1) {
+                            continue;
+                        }
                 } else if(pipeFlag == 0 && redirectionFlag == 0){
-                        split_command(cmdCopy, com);
+                        int success = split_command(cmdCopy, com); // If success is 0, its fine. If its 1, its BAD.
+                        if (success == 1) {
+                            continue;
+                        }
                 }
 
 
