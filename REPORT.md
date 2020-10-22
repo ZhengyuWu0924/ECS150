@@ -216,7 +216,17 @@ instead of ```stdout``` were detected after testing with
 
 ## Challenges
 
+This was a very intensive project, with the hardest parts being piping
 
+and parsing the command line. Figuring out the structure of the 
+
+```Command``` struct was not too complicated and worked throughout the 
+
+rest of the project. We had to completely revamp the parsing logic to
+
+account for redirection because at first, the symbol ```>``` 
+
+was taken as an argument.
 
 
 ## Source
@@ -224,3 +234,5 @@ instead of ```stdout``` were detected after testing with
 [GNU C Library](https://www.gnu.org/software/libc/manual/html_mono/libc.html)
 
 [Markdown Cheatsheet](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet)
+
+[Linux man pages](https://man7.org/linux/man-pages/index.html)
