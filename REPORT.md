@@ -39,6 +39,7 @@ has its own command and arguments.
   user include any output redirection signal, pipe signal, or append 
 
   signals. 
+  
   + Output redirection 
 
     If there is output redirection signal in a command, the program 
@@ -103,8 +104,21 @@ has its own command and arguments.
 
 
 + Redirect Output
-  + （edit here）
-    + （edit here）
+  + We first detect if the output redirection symbol ```>```
+    
+    exists in the original command. We then check if a double
+    
+    ```>>``` exists.  
+      
+    + If appending is required, we open a file
+    
+      with ```O_APPEND``` option.
+    
+    + If its plain redirection
+    
+      (we want to truncate the file), we use the ```O_TRUNC```
+    
+      option.
 
 
 
@@ -175,13 +189,13 @@ has its own command and arguments.
 
 ## Test
 
-Manually test has been done for each part. 
+Manual testing has been done for each part. 
 
-We also use ```tester.sh``` provided by professor on Canvas to test 
+We also used ```tester.sh``` provided by professor Porquet to test 
 
 our program on CSIF environment. 
 
-Fully point received.
+We've passed all the test cases.
 
 
 
