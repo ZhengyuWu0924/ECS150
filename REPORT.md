@@ -28,7 +28,11 @@ has its own command and arguments.
 
 ## Execution Procedure
 
++ Except for commands ```cd```, ```pwd```, ```exit```, and
 
+  ```sls```, all other commands first require a fork to make
+  
+  a child, which then performs the necessary command executions.
 
 + Check if there is special requirements in user command
 
@@ -183,7 +187,14 @@ has its own command and arguments.
 
     child processes, and use it later on printing out the command
 
-    completion message. 
+    completion message.
+   
++ Built-in commands
+  + The remaining built-in commands such as ```cat``` and ```grep```
+  
+    are executed using ```execvp()```. We use ```execvp()``` to 
+    
+    automatically search for programs in ```$PATH```.
 
 
 
