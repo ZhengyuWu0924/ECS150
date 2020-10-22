@@ -43,7 +43,15 @@ has its own command and arguments.
 
     If there is output redirection signal in a command, the program 
 
-    will make a special split of commands later.
+    will make a special split of commands later. This is done by 
+    
+    first splitting the original command by the redirection symbol
+    
+    ```>```, and then further splitting the left side into command
+    
+    and arguments. The right side is put into the filename slot of 
+    
+    the command structure.
 
   + Pipe 
 
@@ -53,11 +61,17 @@ has its own command and arguments.
 
   + Append 
 
-    (EDIT HERE)
+    Appending to a file exists only if there first is a redirection
+    
+    signal. First check if redirection exists in the original command.
+    
+    If the next character is also a ```>```, then we open the file in 
+    
+    append mode, and not in truncate mode.
 
 + Check error in command 
 
-  According to project requirement, there are three types of 
+  According to the project requirement, there are three types of 
 
   errors, as the shell will terminate itself when a library 
 
@@ -78,7 +92,13 @@ has its own command and arguments.
 
   + Launching error 
 
-    (EDIT HERE)
+    This error occurs when a folder cannot be accessed/opened,
+    
+    or if the folder does not exist. If we request a non-existent
+    
+    folder to be opened (as per ```opendir()```), then we display
+    
+    the error ```"Error: cannot cd into directory"```.
 
 
 
