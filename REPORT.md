@@ -1,6 +1,6 @@
 # ECS 150 Project 1
 
-Akash, Student ID 
+Akash Arun Malode, 914706364 
 
 Zhengyu Wu, 916951023
 
