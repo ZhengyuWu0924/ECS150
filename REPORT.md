@@ -200,13 +200,22 @@ has its own command and arguments.
 
 ## Test
 
-Manual testing has been done for each part. 
+Extensive manual testing has been done for each part.
 
 We also used ```tester.sh``` provided by professor Porquet to test 
 
 our program on CSIF environment. 
 
 We've passed all the test cases.
+
+Some errors such as printing the ```pwd``` result to ```stderr```
+
+instead of ```stdout``` were detected after testing with
+
+```tester.sh```.
+
+## Challenges
+
 
 
 
