@@ -12,21 +12,34 @@
 
 //Global Variable
 int pipe_index = 0;
-int mislocatedOut = 0;
+int mislocatedOut = 0; // indicate if there is output mislocate in pipe
 
+/**
+ * CMD structure
+ * Store command entered by user
+ */
 typedef struct{
     char* cmd;
     char** args;
     char* filename;
 }Command;
 
+/**
+ * Pipe command structure
+ * Store commands when user enters pipe signals
+ */
 typedef struct{
-        Command *pipe1;
-        Command *pipe2;
-        Command *pipe3;
-        Command *pipe4;
+        Command *pipeCommand1;
+        Command *pipeCommand2;
+        Command *pipeCommand3;
+        Command *pipeCommand4;
 }Pipecmd;
 
+/**
+ * Detect if a user command contains output
+ * redirection signals
+ * @return 1, if there is output redirection requirement
+ */
 int isRedirection(char* cmdString) {
         if (strchr(cmdString, '>') == NULL) {
                 return 0;
@@ -47,19 +60,25 @@ int isAppend(char* cmdString) {
     }
     return 0;
 }
-
+/**
+ * Detect if a user command contains pipe signals
+ * @return 1, if there is pipe signal
+ */
 int isPipe(char* cmdString){
         if(strchr(cmdString, '|') == NULL){
-                //There is not even one pipe sign in command
                 return 0;
         }
         return 1;
 }
+/**
+ * Split general command entered by user
+ * Store the splitted command in the data structure for further use
+ */
 int split_command(char* cmdString, Command* com){
         char* commandline = malloc(512 * sizeof(char));
         strcpy(commandline, cmdString);
 
-        char* spaceDelimiter = " ";
+        char* spaceDelimiter = " "; // Split by space
         char* string;
 
         int index = 0;
@@ -85,6 +104,10 @@ int split_command(char* cmdString, Command* com){
         return 0;
 }
 
+/**
+ * Split command with output redirection requirement
+ * Store the splitted command in the command data structure for further use
+ */
 int split_command_redirection(char* cmdString, Command* com) {
 
         char* commandline = malloc(512 * sizeof(char));
@@ -158,7 +181,11 @@ int split_command_redirection(char* cmdString, Command* com) {
         free(checkRedirection);
         return 0;
 }
-
+/**
+ * Split command with pipe signals.
+ * Store the splitted commands to pipe command data structure for
+ * furether use
+ */
 void split_pipe(char* cmdString, Pipecmd *pipe){
         char* commandline = malloc(512 * sizeof(char));
         strcpy(commandline, cmdString);
@@ -175,7 +202,10 @@ void split_pipe(char* cmdString, Pipecmd *pipe){
         int has4thStr = 0;
         if(strncmp(cmdString, pipeDelimiter, 1) == 0){
                 pipe_index++;
-                strcpy(pipe->pipe1->cmd, "NULLPIPE");
+                // If the first thing in the command is '|'
+                // return to main then print error message
+                // "Error: missing command"
+                strcpy(pipe->pipeCommand1->cmd, "NULLPIPE");
                 return;
         } else {
                 string = strtok(commandline, pipeDelimiter);
@@ -186,27 +216,33 @@ void split_pipe(char* cmdString, Pipecmd *pipe){
                                 mislocatedOut = 1;
                         }
                         if(strcmp(pipe1Str, " ") == 0){
-                                strcpy(pipe->pipe1->cmd, "NULLPIPE");
+                                // First command is empty space
+                                // Missing command
+                                strcpy(pipe->pipeCommand1->cmd, "NULLPIPE");
                         }
                         string = strtok(NULL, pipeDelimiter);
                         if(string == NULL){
-                                strcpy(pipe->pipe2->cmd, "NULLPIPE");
+                                // Second command is empty
+                                // Missing command
+                                strcpy(pipe->pipeCommand2->cmd, "NULLPIPE");
                         } else {
                                 strcpy(pipe2Str, string);
                                 if(strcmp(pipe2Str, " ") == 0){
-                                        strcpy(pipe->pipe2->cmd, "NULLPIPE");
+                                        // Second command is empty space
+                                        // Missing command 
+                                        strcpy(pipe->pipeCommand2->cmd, "NULLPIPE");
                                 }
                                 string = strtok(NULL, pipeDelimiter);
-
                         }
                 }
-
         }
 
         while(string != NULL){
                 if(pipe_index == 1){
                         if(string == NULL){
-                                strcpy(pipe->pipe3->cmd, "NULLPIPE");
+                                // Third command is empty
+                                // Missing command
+                                strcpy(pipe->pipeCommand3->cmd, "NULLPIPE");
                                 break;
                         }
                         strcpy(pipe3Str, string);
@@ -216,52 +252,58 @@ void split_pipe(char* cmdString, Pipecmd *pipe){
                                 break;
                         }
                         if(strcmp(pipe3Str, " ") == 0){
-                                strcpy(pipe->pipe3->cmd, "NULLPIPE");
+                                // Third command is empty space
+                                // Missing command
+                                strcpy(pipe->pipeCommand3->cmd, "NULLPIPE");
                                 break;
                         } else {
                                 has3rdStr = 1;
                                 string =strtok(NULL, pipeDelimiter);
                                 if(string == NULL){
-                                        strcpy(pipe->pipe4->cmd, "NULLPIPE");
+                                        // Fouth command is empty
+                                        // Missing command
+                                        strcpy(pipe->pipeCommand4->cmd, "NULLPIPE");
                                         break;
                                 }
                         }
-
                 }
                 if(pipe_index == 2){
                         pipe_index++;
-                        if(isRedirection(pipe1Str) == 1 || isRedirection(pipe2Str) == 1 || isRedirection(pipe3Str) == 1){
+                        if(isRedirection(pipe1Str) == 1 || isRedirection(pipe2Str) == 1 
+                        || isRedirection(pipe3Str) == 1){
                                 mislocatedOut = 1;
                                 break;
                         }
                         strcpy(pipe4Str, string);
                         if(strcmp(pipe4Str, " ") == 0){
-                                strcpy(pipe->pipe4->cmd, "NULLPIPE");
+                                // Fouth command is empty space
+                                // Missing command
+                                strcpy(pipe->pipeCommand4->cmd, "NULLPIPE");
                                 break;
                         } else {
                                 has4thStr = 1;
                                 break;
                         }
-
                 }
-
         }
-        split_command(pipe1Str, pipe->pipe1);
+        split_command(pipe1Str, pipe->pipeCommand1);
 
-        // isMislocatedOutput(pipe1Cpy);
         if(has3rdStr == 0){
-                split_command_redirection(pipe2Str, pipe->pipe2);
+                // Second command is the last, output redirection permitted
+                split_command_redirection(pipe2Str, pipe->pipeCommand2);
 
         }
         if(has4thStr == 0 && has3rdStr == 1){
-                split_command(pipe2Str, pipe->pipe2);
-                split_command_redirection(pipe3Str, pipe->pipe3);
+                split_command(pipe2Str, pipe->pipeCommand2);
+                // Third command is the last, output redirection permitted
+                split_command_redirection(pipe3Str, pipe->pipeCommand3);
         }
 
         if(has4thStr == 1){
-                split_command(pipe2Str, pipe->pipe2);
-                split_command(pipe3Str, pipe->pipe3);
-                split_command_redirection(pipe4Str, pipe->pipe4);
+                split_command(pipe2Str, pipe->pipeCommand2);
+                split_command(pipe3Str, pipe->pipeCommand3);
+                // Fouth command is the last, output redirection permitted
+                split_command_redirection(pipe4Str, pipe->pipeCommand4);
 
         }
 
@@ -272,9 +314,12 @@ void split_pipe(char* cmdString, Pipecmd *pipe){
         free(pipe4Str);
 }
 
+/**
+ * Shell to run the general commands.
+ * Implemented with fork() + exec() + wait() method
+ */
 int sshellSystem(Command* com, int redirectionFlag, int appendFlag){
         pid_t pid;
-        // char *args[] = {"sh","-c",cmdString, NULL};
         int exitStatus;
 
         pid = fork();
@@ -321,264 +366,266 @@ int sshellSystem(Command* com, int redirectionFlag, int appendFlag){
         }
         return exitStatus;
 }
-
+/**
+ * Shell to run command with pipe signals
+ * Implemented with fork() + exec() + wait() method
+ */
 int* sshellSystem_pipe(Pipecmd* cmdPipe, int redirectionFlag){
-        pid_t pipe1Pid;
-        pid_t pipe2Pid;
-        pid_t pipe3Pid;
-        pid_t pipe4Pid;
-
+        // We assumen there is up to 3 pipes
         int first_fd[2];
         int second_fd[2];
         int third_fd[2];
 
-        static int exitStatus[4];
+        // 4 commands in 3 pipes
+        pid_t pipeCommand1Pid;
+        pid_t pipeCommand2Pid;
+        pid_t pipeCommand3Pid;
+        pid_t pipeCommand4Pid;
+
+        static int exitStatus[4]; // return exit values
         int totalPipeSiganl = pipe_index;
         int status[4];
-        if(totalPipeSiganl == 1){
-                pipe(first_fd);
 
-                pipe1Pid = fork();
-                if(pipe1Pid == 0){
-
+        if(totalPipeSiganl == 1){ // Exactly 1 pipe
+                pipe(first_fd); // Create a pipe 
+                pipeCommand1Pid = fork(); // Execute the first command in pipe
+                if(pipeCommand1Pid == 0){
+                        // Child
                         close(first_fd[0]); // Close the pipe input
-                        dup2(first_fd[1], STDOUT_FILENO);
-                        close(first_fd[1]);
-                        execvp(cmdPipe->pipe1->cmd, cmdPipe->pipe1->args);
+                        dup2(first_fd[1], STDOUT_FILENO); // Output to pipe
+                        close(first_fd[1]); // Close the pipe output
+                        execvp(cmdPipe->pipeCommand1->cmd, cmdPipe->pipeCommand1->args);
                         perror("execvp");
                         exit(1);
 
-                } else if(pipe1Pid != 0){
-                        waitpid(pipe1Pid, &status[0],0);
+                } else if(pipeCommand1Pid != 0){
+                        // Parent
+                        waitpid(pipeCommand1Pid, &status[0],0);
                         exitStatus[0] = WEXITSTATUS(status[0]);
                 }
-                pipe2Pid = fork();
-                if(pipe2Pid == 0){
-
+                pipeCommand2Pid = fork(); //Execute the second command in pipe
+                if(pipeCommand2Pid == 0){
+                        // Child
                         if (redirectionFlag) { // If there is redirection
-                                close(first_fd[1]);
-                                dup2(first_fd[0], STDIN_FILENO);
-                                close(first_fd[0]);
-
-                                if (cmdPipe->pipe2->filename == NULL) {
+                                close(first_fd[1]); // Close the pipe output
+                                dup2(first_fd[0], STDIN_FILENO); // Input from pipe
+                                close(first_fd[0]); // Close the pipe input
+                                if (cmdPipe->pipeCommand2->filename == NULL) {
                                         fprintf(stderr, "Error: no output file\n");
                                         exit(1);
                                 }
-
                                 int fdirection;
-                                fdirection = open(cmdPipe->pipe2->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                                fdirection = open(cmdPipe->pipeCommand2->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
                                 if (fdirection == -1) {
                                         fprintf(stderr, "Error: cannot open output file\n");
                                         exit(1);
                                 }
-                                dup2(fdirection, STDOUT_FILENO);
-                                close(fdirection);
-                                close(first_fd[1]);
-                                dup2(first_fd[0], STDIN_FILENO);
-                                close(first_fd[0]);
-                                execvp(cmdPipe->pipe2->cmd, cmdPipe->pipe2->args);
+                                dup2(fdirection, STDOUT_FILENO); // Output to file
+                                close(fdirection); // Close file
+                                close(first_fd[1]); // Close pipe output
+                                dup2(first_fd[0], STDIN_FILENO); // Input from pipe
+                                close(first_fd[0]); // Close pipe input
+                                execvp(cmdPipe->pipeCommand2->cmd, cmdPipe->pipeCommand2->args);
                                 perror("execvp");
                                 exit(1);
                         } else { // No redirection
-                                close(first_fd[1]);
-                                dup2(first_fd[0], STDIN_FILENO);
-                                close(first_fd[0]);
-                                execvp(cmdPipe->pipe2->cmd, cmdPipe->pipe2->args);
+                                close(first_fd[1]); // Close the pipe output
+                                dup2(first_fd[0], STDIN_FILENO); // Input from pipe
+                                close(first_fd[0]); // Close the pipe input
+                                execvp(cmdPipe->pipeCommand2->cmd, cmdPipe->pipeCommand2->args);
                                 perror("execvp");
                                 exit(1);
                         }
-
-
-
-                } else if (pipe2Pid != 0){
-                        close(first_fd[0]); // Totally close the pipe
-                        close(first_fd[1]); // Totally close the pipe
-                        waitpid(pipe2Pid, &status[1],0);
+                } else if (pipeCommand2Pid != 0){
+                        // Parent
+                        // Totally close pipe
+                        close(first_fd[0]);
+                        close(first_fd[1]);
+                        waitpid(pipeCommand2Pid, &status[1],0);
                         exitStatus[1] = WEXITSTATUS(status[1]);
                 }
-        } else if(totalPipeSiganl == 2){
-                pipe(first_fd);
-                pipe(second_fd);
-                pipe1Pid = fork();
-                if(pipe1Pid == 0){
-                        //Child 1
-                        // printf("processing left\n");
-                        close(first_fd[0]);
-                        dup2(first_fd[1], STDOUT_FILENO);
-                        close(first_fd[1]);
-                        // close(fd[1]);
-                        // printf("left cmd :%s\n", cmdPipe->pipe1->cmd);
-                        // write(fd[1], send, 7);
-                        execvp(cmdPipe->pipe1->cmd, cmdPipe->pipe1->args);
+
+        } else if(totalPipeSiganl == 2){ // 2 Pipes
+                pipe(first_fd); // First pipe
+                pipe(second_fd); // Second pipe
+                pipeCommand1Pid = fork();
+                if(pipeCommand1Pid == 0){ // Execute the first command in pipe
+                        // Child
+                        close(first_fd[0]); // Close pipe1 input
+                        dup2(first_fd[1], STDOUT_FILENO); // Output to pipe1
+                        close(first_fd[1]); // Close pipe1 output
+                        execvp(cmdPipe->pipeCommand1->cmd, cmdPipe->pipeCommand1->args);
                         perror("execvp");
                         exit(1);
-                } else if(pipe1Pid != 0){
-                        //parent
-                        waitpid(pipe1Pid, &status[0],0);
+                } else if(pipeCommand1Pid != 0){
+                        // Parent
+                        waitpid(pipeCommand1Pid, &status[0],0);
                         exitStatus[0] = WEXITSTATUS(status[0]);
                 }
-
-                pipe2Pid = fork();
-                if(pipe2Pid == 0){
-                        close(first_fd[1]);
-                        dup2(first_fd[0], STDIN_FILENO);
-                        close(first_fd[0]);
-
-                        close(second_fd[0]);
-                        dup2(second_fd[1], STDOUT_FILENO);
-                        close(second_fd[1]);
-                        execvp(cmdPipe->pipe2->cmd, cmdPipe->pipe2->args);
+                pipeCommand2Pid = fork();
+                if(pipeCommand2Pid == 0){ // Execute the second command in pipe
+                        close(first_fd[1]); // Close pipe1 output
+                        dup2(first_fd[0], STDIN_FILENO); // Input from pipe1
+                        close(first_fd[0]); // Close pipe1 input
+                        // Pipe 1 ends
+                        // Pipe 2 start
+                        close(second_fd[0]); // Close pipe2 input
+                        dup2(second_fd[1], STDOUT_FILENO); // Output to pipe2
+                        close(second_fd[1]);// Close pipe2 output
+                        execvp(cmdPipe->pipeCommand2->cmd, cmdPipe->pipeCommand2->args);
                         perror("execvp");
                         exit(1);
-                } else if (pipe2Pid != 0){
-                        // waitpid(pipe1Pid, &status[0],0);
+                } else if (pipeCommand2Pid != 0){
+                        // Parent
+                        // Totally close pipe1
                         close(first_fd[0]);
                         close(first_fd[1]);
-                        waitpid(pipe2Pid, &status[1],0);
-                        // exitStatus[0] = WEXITSTATUS(status[0]);
+                        waitpid(pipeCommand2Pid, &status[1],0);
                         exitStatus[1] = WEXITSTATUS(status[1]);
                 }
-                pipe3Pid = fork();
-                if(pipe3Pid == 0){
+                pipeCommand3Pid = fork();
+                if(pipeCommand3Pid == 0){ // Execute the third command in pipe
                         if (redirectionFlag) { // If there is redirection
-                                close(second_fd[1]);
-                                dup2(second_fd[0], STDIN_FILENO);
-                                close(second_fd[0]);
-
-                                if (cmdPipe->pipe3->filename == NULL) {
+                                close(second_fd[1]); // Close pipe2
+                                dup2(second_fd[0], STDIN_FILENO); // Input from pipe2
+                                close(second_fd[0]); // Close pipe2 input
+                                if (cmdPipe->pipeCommand3->filename == NULL) {
                                         fprintf(stderr, "Error: no output file\n");
                                         exit(1);
                                 }
-
                                 int fdirection;
-                                fdirection = open(cmdPipe->pipe3->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                                fdirection = open(cmdPipe->pipeCommand3->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
                                 if (fdirection == -1) {
                                         fprintf(stderr, "Error: cannot open output file\n");
                                         exit(1);
                                 }
-                                dup2(fdirection, STDOUT_FILENO);
-                                close(fdirection);
-                                close(second_fd[1]);
-                                dup2(second_fd[0], STDIN_FILENO);
-                                close(second_fd[0]);
-                                execvp(cmdPipe->pipe3->cmd, cmdPipe->pipe3->args);
+                                dup2(fdirection, STDOUT_FILENO); // Output to file
+                                close(fdirection); // Close file
+                                close(second_fd[1]); // Clode pipe2 output
+                                dup2(second_fd[0], STDIN_FILENO); // Input from pipe2
+                                close(second_fd[0]); // Close pipe2 input
+                                execvp(cmdPipe->pipeCommand3->cmd, cmdPipe->pipeCommand3->args);
                                 perror("execvp");
                                 exit(1);
                         } else { // No redirection
-                                close(second_fd[1]);
-                                dup2(second_fd[0], STDIN_FILENO);
-                                close(second_fd[0]);
-                                execvp(cmdPipe->pipe3->cmd, cmdPipe->pipe3->args);
+                                close(second_fd[1]); // Close pipe2 output
+                                dup2(second_fd[0], STDIN_FILENO); // Input from pipe2
+                                close(second_fd[0]); // Close pipe2 input
+                                execvp(cmdPipe->pipeCommand3->cmd, cmdPipe->pipeCommand3->args);
                                 perror("execvp");
                                 exit(1);
                         }
-                }else if (pipe3Pid != 0){
+                }else if (pipeCommand3Pid != 0){
+                        // Parent
+                        // Totally close pipe2
                         close(second_fd[0]);
                         close(second_fd[1]);
-                        waitpid(pipe3Pid, &status[2],0);
+                        waitpid(pipeCommand3Pid, &status[2],0);
                         exitStatus[2] = WEXITSTATUS(status[2]);
                 }
 
-        } else if(totalPipeSiganl == 3){
-                pipe(first_fd);
+        } else if(totalPipeSiganl == 3){ // 3 pipes
+                pipe(first_fd); 
                 pipe(second_fd);
-                pipe(third_fd);
-                pipe1Pid = fork();
-                if(pipe1Pid == 0){
-                        //Child 1
-                        // printf("processing left\n");
-                        close(first_fd[0]);
-                        dup2(first_fd[1], STDOUT_FILENO);
-                        close(first_fd[1]);
-                        // close(fd[1]);
-                        // printf("left cmd :%s\n", cmdPipe->pipe1->cmd);
-                        // write(fd[1], send, 7);
-                        execvp(cmdPipe->pipe1->cmd, cmdPipe->pipe1->args);
+                pipe(third_fd); // Third pipe
+                pipeCommand1Pid = fork();
+                if(pipeCommand1Pid == 0){ // Execute the first command in pipe
+                        // Child
+                        close(first_fd[0]); // Close pipe1 input
+                        dup2(first_fd[1], STDOUT_FILENO); // Output to pipe1
+                        close(first_fd[1]); // Close pipe1 output
+                        execvp(cmdPipe->pipeCommand1->cmd, cmdPipe->pipeCommand1->args);
                         perror("execvp");
                         exit(1);
-                } else if(pipe1Pid != 0){
-                        //parent
-                        waitpid(pipe1Pid, &status[0],0);
+                } else if(pipeCommand1Pid != 0){
+                        //Parent
+                        waitpid(pipeCommand1Pid, &status[0],0);
                         exitStatus[0] = WEXITSTATUS(status[0]);
                 }
 
-                pipe2Pid = fork();
-                if(pipe2Pid == 0){
-                        close(first_fd[1]);
-                        dup2(first_fd[0], STDIN_FILENO);
-                        close(first_fd[0]);
-
-                        close(second_fd[0]);
-                        dup2(second_fd[1], STDOUT_FILENO);
-                        close(second_fd[1]);
-                        execvp(cmdPipe->pipe2->cmd, cmdPipe->pipe2->args);
+                pipeCommand2Pid = fork();
+                if(pipeCommand2Pid == 0){ // Execute the second command in pipe
+                        close(first_fd[1]); // Close pipe1 output
+                        dup2(first_fd[0], STDIN_FILENO); // Input from pipe1
+                        close(first_fd[0]); // Close pipe1 input
+                        // Pipe 1 ends
+                        // Pipe 2 starts
+                        close(second_fd[0]); // Close pipe2 input
+                        dup2(second_fd[1], STDOUT_FILENO); // Output to pipe2
+                        close(second_fd[1]); // Close pipe2 output
+                        execvp(cmdPipe->pipeCommand2->cmd, cmdPipe->pipeCommand2->args);
                         perror("execvp");
                         exit(1);
-                } else if (pipe2Pid != 0){
-                        // waitpid(pipe1Pid, &status[0],0);
+                } else if (pipeCommand2Pid != 0){
+                        // Parent
+                        // Totally close pipe1
                         close(first_fd[0]);
                         close(first_fd[1]);
-                        waitpid(pipe2Pid, &status[1],0);
-                        // exitStatus[0] = WEXITSTATUS(status[0]);
+                        waitpid(pipeCommand2Pid, &status[1],0);
                         exitStatus[1] = WEXITSTATUS(status[1]);
                 }
 
-                pipe3Pid = fork();
-                if(pipe3Pid == 0){
-                        close(second_fd[1]);
-                        dup2(second_fd[0], STDIN_FILENO);
-                        close(second_fd[0]);
-
-                        close(third_fd[0]);
-                        dup2(third_fd[1],STDOUT_FILENO);
-                        close(third_fd[1]);
-                        execvp(cmdPipe->pipe3->cmd, cmdPipe->pipe3->args);
+                pipeCommand3Pid = fork();
+                if(pipeCommand3Pid == 0){ // Execute the third command in pipe
+                        close(second_fd[1]); // Close pipe2 output
+                        dup2(second_fd[0], STDIN_FILENO); // Input from pipe2
+                        close(second_fd[0]); // Close pipe2 input
+                        // Pipe2 ends
+                        // Pipe2 starts
+                        close(third_fd[0]); // Close pipe3 input
+                        dup2(third_fd[1],STDOUT_FILENO); // Output to pipe3
+                        close(third_fd[1]); // Close pipe3 output
+                        execvp(cmdPipe->pipeCommand3->cmd, cmdPipe->pipeCommand3->args);
                         perror("execvp");
                         exit(1);
-                }else if (pipe3Pid != 0){
+                }else if (pipeCommand3Pid != 0){
+                        // Parent
+                        // Totally close pipe2
                         close(second_fd[0]);
                         close(second_fd[1]);
-                        waitpid(pipe3Pid, &status[2],0);
+                        waitpid(pipeCommand3Pid, &status[2],0);
                         exitStatus[2] = WEXITSTATUS(status[2]);
                 }
-                pipe4Pid = fork();
-                if(pipe4Pid == 0){
+                pipeCommand4Pid = fork();
+                if(pipeCommand4Pid == 0){ // Execute the fouth command in pipe
                         if (redirectionFlag) { // If there is redirection
-                                close(third_fd[1]);
-                                dup2(third_fd[0], STDIN_FILENO);
-                                close(third_fd[0]);
+                                close(third_fd[1]); // Close pipe3 output
+                                dup2(third_fd[0], STDIN_FILENO); // Input from pipe3
+                                close(third_fd[0]); // Close pipe3 input
 
-                                if (cmdPipe->pipe4->filename == NULL) {
+                                if (cmdPipe->pipeCommand4->filename == NULL) {
                                         fprintf(stderr, "Error: no output file\n");
                                         exit(1);
                                 }
 
                                 int fdirection;
-                                fdirection = open(cmdPipe->pipe4->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                                fdirection = open(cmdPipe->pipeCommand4->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
                                 if (fdirection == -1) {
                                         fprintf(stderr, "Error: cannot open output file\n");
                                         exit(1);
                                 }
-                                dup2(fdirection, STDOUT_FILENO);
-                                close(fdirection);
-                                close(third_fd[1]);
-                                dup2(third_fd[0], STDIN_FILENO);
-                                close(third_fd[0]);
-                                execvp(cmdPipe->pipe4->cmd, cmdPipe->pipe4->args);
+                                dup2(fdirection, STDOUT_FILENO); // Output to file
+                                close(fdirection); // Close file
+                                close(third_fd[1]); // Close pipe3 output
+                                dup2(third_fd[0], STDIN_FILENO); // Input from pipe3
+                                close(third_fd[0]); // Close pipe3 input
+                                execvp(cmdPipe->pipeCommand4->cmd, cmdPipe->pipeCommand4->args);
                                 perror("execvp");
                                 exit(1);
                         } else { // No redirection
-                                close(third_fd[1]);
-                                dup2(third_fd[0], STDIN_FILENO);
-                                close(third_fd[0]);
-                                execvp(cmdPipe->pipe4->cmd, cmdPipe->pipe4->args);
+                                close(third_fd[1]); // Close pipe3 output
+                                dup2(third_fd[0], STDIN_FILENO); // Input from pipe3
+                                close(third_fd[0]); // Close pipe3 input
+                                execvp(cmdPipe->pipeCommand4->cmd, cmdPipe->pipeCommand4->args);
                                 perror("execvp");
                                 exit(1);
                         }
-                } else if(pipe4Pid != 0){
+                } else if(pipeCommand4Pid != 0){
+                        // Parent
+                        // Totally close pipe3
                         close(third_fd[0]);
                         close(third_fd[1]);
-                        waitpid(pipe4Pid, &status[3],0);
+                        waitpid(pipeCommand4Pid, &status[3],0);
                         exitStatus[3] = WEXITSTATUS(status[3]);
                 }
         }
@@ -586,12 +633,17 @@ int* sshellSystem_pipe(Pipecmd* cmdPipe, int redirectionFlag){
         return exitStatus;
 
 }
-
+/**
+ * Builtin command --- exit
+ */
 int builtin_exit(){
         fprintf(stderr, "Bye...\n");
         return 0;
 }
 
+/**
+ * Builtin command --- cd
+ */
 int builtin_cd(Command* com){
         // Assume exactly one argument for cd
         DIR* dirp;
@@ -605,6 +657,9 @@ int builtin_cd(Command* com){
 
 }
 
+/**
+ * Builtin command --- pwd
+ */
 int builtin_pwd(char* workingDirectory){
         fprintf(stdout, "%s\n", workingDirectory);
         return 0;
@@ -633,10 +688,19 @@ int sls_command() {
     return 0;
 }
 
+/**
+ * Print completation message after running user command
+ * Display the exit value for the command
+ */
 void print_completation(char* cmdCopy, int returnVal){
         fprintf(stderr, "+ completed '%s' [%d]\n",
                         cmdCopy, returnVal);
 }
+
+/**
+ * Print completation message after running pipe
+ * Display all the exit value  of each command composing the pipe separately
+ */
 void print_pipe_completation(char* cmdCopy, int* returnVal, int pipe_index){
         if(pipe_index == 1){
                 fprintf(stderr, "+ completed '%s' [%d][%d]\n",
@@ -692,52 +756,54 @@ int main(void)
                 /* Regular command */
                 // retval = system(cmd);
 
+                /* Command structure initializing */
                 Command* com = NULL;
                 com = malloc(sizeof(Command));
                 com->cmd = malloc(32 * sizeof(char));
                 com->args = malloc(16 * sizeof(char*));
-
-
                 for (int i = 0; i < 16; i++) {
                     com->args[i] = malloc(32 * sizeof(char));
                 }
                 com->filename = malloc(32 * sizeof(char));
 
+                /* Pipe structure initializing */
                 Pipecmd* pipe = NULL;
                 pipe = malloc(sizeof(Pipecmd));
-                pipe->pipe1 = malloc(sizeof(Command));
-                pipe->pipe1->cmd = malloc(32 * sizeof(char));
-                pipe->pipe1->args = malloc(16 * sizeof(char*));
+                pipe->pipeCommand1 = malloc(sizeof(Command));
+                pipe->pipeCommand1->cmd = malloc(32 * sizeof(char));
+                pipe->pipeCommand1->args = malloc(16 * sizeof(char*));
                 for (int i = 0; i < 16; i++) {
-                    pipe->pipe1->args[i] = malloc(32 * sizeof(char));
+                    pipe->pipeCommand1->args[i] = malloc(32 * sizeof(char));
                 }
-                pipe->pipe1->filename = malloc(32 * sizeof(char));
+                pipe->pipeCommand1->filename = malloc(32 * sizeof(char));
 
 
-                pipe->pipe2 = malloc(sizeof(Command));
-                pipe->pipe2->cmd = malloc(32 * sizeof(char));
-                pipe->pipe2->args = malloc(16 * sizeof(char*));
+                pipe->pipeCommand2 = malloc(sizeof(Command));
+                pipe->pipeCommand2->cmd = malloc(32 * sizeof(char));
+                pipe->pipeCommand2->args = malloc(16 * sizeof(char*));
                 for (int i = 0; i < 16; i++) {
-                    pipe->pipe2->args[i] = malloc(32 * sizeof(char));
+                    pipe->pipeCommand2->args[i] = malloc(32 * sizeof(char));
                 }
-                pipe->pipe2->filename = malloc(32 * sizeof(char));
+                pipe->pipeCommand2->filename = malloc(32 * sizeof(char));
 
-                pipe->pipe3 = malloc(sizeof(Command));
-                pipe->pipe3->cmd = malloc(32 * sizeof(char));
-                pipe->pipe3->args = malloc(16 * sizeof(char*));
+                pipe->pipeCommand3 = malloc(sizeof(Command));
+                pipe->pipeCommand3->cmd = malloc(32 * sizeof(char));
+                pipe->pipeCommand3->args = malloc(16 * sizeof(char*));
                 for (int i = 0; i < 16; i++) {
-                    pipe->pipe3->args[i] = malloc(32 * sizeof(char));
+                    pipe->pipeCommand3->args[i] = malloc(32 * sizeof(char));
                 }
-                pipe->pipe3->filename = malloc(32 * sizeof(char));
+                pipe->pipeCommand3->filename = malloc(32 * sizeof(char));
 
-                pipe->pipe4 = malloc(sizeof(Command));
-                pipe->pipe4->cmd = malloc(32 * sizeof(char));
-                pipe->pipe4->args = malloc(16 * sizeof(char*));
+                pipe->pipeCommand4 = malloc(sizeof(Command));
+                pipe->pipeCommand4->cmd = malloc(32 * sizeof(char));
+                pipe->pipeCommand4->args = malloc(16 * sizeof(char*));
                 for (int i = 0; i < 16; i++) {
-                    pipe->pipe4->args[i] = malloc(32 * sizeof(char));
+                    pipe->pipeCommand4->args[i] = malloc(32 * sizeof(char));
                 }
-                pipe->pipe4->filename = malloc(32 * sizeof(char));
+                pipe->pipeCommand4->filename = malloc(32 * sizeof(char));
 
+
+                /* Redirection signal detection */
                 int redirectionFlag = 0;
                 if(isRedirection(cmdCopy)){
                         redirectionFlag = 1;
@@ -752,12 +818,15 @@ int main(void)
 
                 strcpy(cmdCopy, cmd); // Reset cmdCopy incase it was modified
 
+                /* Pipe signal detection */
                 int pipeFlag = 0;
                 if(isPipe(cmdCopy)){
                         pipeFlag = 1;
                 }
 
-                if(pipeFlag == 1){
+                strcpy(cmdCopy, cmd); // Reset cmdCopy incase it was modified
+
+                if(pipeFlag == 1){ //If there is pipe signal
                         split_pipe(cmdCopy, pipe);
                 } else if(redirectionFlag == 1 && pipeFlag == 0){
                         int success = split_command_redirection(cmdCopy, com);
@@ -771,54 +840,49 @@ int main(void)
                         }
                 }
 
-                // if(strcmp(pipe->pipe1->cmd, "NULLPIPE") == 0 ||
-                //    strcmp(pipe->pipe2->cmd, "NULLPIPE") == 0 ||
-                //    strcmp(pipe->pipe3->cmd, "NULLPIPE") == 0 ||
-                //    strcmp(pipe->pipe4->cmd, "NULLPIPE") == 0 ){
-                //         fprintf(stderr, "Error: missing command\n");
-                //         continue;
-                // }
-
-                if(strcmp(pipe->pipe1->cmd, "NULLPIPE") == 0){
+                /* Error management */
+                
+                // Single pipe signal
+                if(strcmp(pipe->pipeCommand1->cmd, "NULLPIPE") == 0){ //Left comment is missing
                         fprintf(stderr, "Error: missing command\n");
                         continue;
                 }
-                if(strcmp(pipe->pipe2->cmd, "NULLPIPE") == 0){
+                if(strcmp(pipe->pipeCommand2->cmd, "NULLPIPE") == 0){ //Right comment is missing
                         fprintf(stderr, "Error: missing command\n");
                         continue;
                 }
-                if(pipe_index == 2){
-                        if(strcmp(pipe->pipe1->cmd, "NULLPIPE") == 0 ||
-                           strcmp(pipe->pipe2->cmd, "NULLPIPE") == 0 ||
-                           strcmp(pipe->pipe3->cmd, "NULLPIPE") == 0){
+                // Multiple pipe signals
+                if(pipe_index == 2){ // 2 pipe signals
+                        if(strcmp(pipe->pipeCommand1->cmd, "NULLPIPE") == 0 ||
+                           strcmp(pipe->pipeCommand2->cmd, "NULLPIPE") == 0 ||
+                           strcmp(pipe->pipeCommand3->cmd, "NULLPIPE") == 0){
                                         fprintf(stderr, "Error: missing command\n");
                                         continue;
                            }
                 }
-                if(pipe_index == 3){
-                        if(strcmp(pipe->pipe1->cmd, "NULLPIPE") == 0 ||
-                           strcmp(pipe->pipe2->cmd, "NULLPIPE") == 0 ||
-                           strcmp(pipe->pipe3->cmd, "NULLPIPE") == 0 ||
-                           strcmp(pipe->pipe4->cmd, "NULLPIPE") == 0){
+                if(pipe_index == 3){ // 3 pipe signals
+                        if(strcmp(pipe->pipeCommand1->cmd, "NULLPIPE") == 0 ||
+                           strcmp(pipe->pipeCommand2->cmd, "NULLPIPE") == 0 ||
+                           strcmp(pipe->pipeCommand3->cmd, "NULLPIPE") == 0 ||
+                           strcmp(pipe->pipeCommand4->cmd, "NULLPIPE") == 0){
                                         fprintf(stderr, "Error: missing command\n");
                                         continue;
                            }
                 }
-
-
-                if(strcmp(com->cmd, "NULLCMD") == 0){
-                        fprintf(stderr, "Error: missing command\n");
-                        continue;
-                }
+                // Output redirection before the last comment in pipe
                 if(mislocatedOut == 1){
                         mislocatedOut = 0;
                         fprintf(stderr, "Error: mislocated output redirection\n");
                         continue;
                 }
+                // Empty command
+                if(strcmp(com->cmd, "NULLCMD") == 0){
+                        fprintf(stderr, "Error: missing command\n");
+                        continue;
+                }
+                
 
-
-
-
+                /* Command Execution */
                 if(!strcmp(com->cmd, "cd")){
                         // Change directory --- 'cd'
                         retval = builtin_cd(com);
@@ -831,7 +895,6 @@ int main(void)
                         print_completation(cmd,retval);
 
                 }else if (!strcmp(com->cmd, "exit")) {
-                        /* Builtin command */
                         // Exit command --- 'exit'
                         retval = builtin_exit();
                         print_completation(cmd, retval);
@@ -840,26 +903,23 @@ int main(void)
                         retval = sls_command();
                         print_completation(cmd, retval);
                 }else {
-                        if(pipeFlag){
-                                int* retarr;
+                        if(pipeFlag){ // run command include pipe
+                                int* retarr; // an array to store exit values
                                 retarr = sshellSystem_pipe(pipe, redirectionFlag);
                                 print_pipe_completation(cmd, retarr, pipe_index);
-                        } else {
+                        } else { // run command not include pipe
                                 retval = sshellSystem(com, redirectionFlag, appendFlag);
                                 if (retval == 0) { // If there was no error
                                         print_completation(cmd,retval);
                                 }
                         }
-
-                        // If retval returns 1, it means there was error
-
                 }
 
                 // Free the memorry
                 free(com);
                 free(cmdCopy);
                 free(pipe);
-
+                // Reset the amount of pipe signal
                 pipe_index = 0;
 
         }
