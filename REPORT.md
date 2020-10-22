@@ -1,11 +1,11 @@
-# ECS 150 Project 1
+# ECS 150 Project 1 (Simple Shell)
 
 Akash Arun Malode, 914706364 
 
 Zhengyu Wu, 916951023
 
 ## Purpose
-To create a shell (sshell) which implements builtin commands,
+To create a simple shell (sshell) which implements builtin commands,
 
 output redirection, pipeline commands, and extra features
 
@@ -40,9 +40,9 @@ has its own command and arguments.
 
   and ```isAppend()``` to detect if the original command entered by 
 
-  user include any output redirection signal, pipe signal, or append 
-
-  signals. 
+  user includes any of the signals- output redirection signal, 
+  
+  pipe signal, or append signals. 
   
   + Output redirection 
 
@@ -60,7 +60,7 @@ has its own command and arguments.
 
   + Pipe 
 
-    If pipe signal has been detected, the program will enter a 
+    If a pipe signal has been detected, the program will enter a 
 
     special command split later.
 
@@ -80,9 +80,9 @@ has its own command and arguments.
 
   errors, as the shell will terminate itself when a library 
 
-  function failed,
+  function fails.
 
-  there are only two types of errors we have to deal with.
+  There are only two types of errors we have to deal with.
   + Parsing error 
 
     If a incorrect command entered by user, the shell will return
@@ -91,7 +91,7 @@ has its own command and arguments.
 
     ```"Error: no output file```. 
 
-    Then run nothing but waiting next input. 
+    Then run nothing, but just wait for the next input. 
 
     *The shell will not die.*
 
@@ -135,7 +135,7 @@ has its own command and arguments.
 
     how we connect pipes and how we execute commands.  
 
-    ***According to requirement, there is up to three pipes.***
+    ***According to the requirement, there are up to three pipes.***
 
   + Connect and execute commands around pipe 
 
@@ -157,9 +157,9 @@ has its own command and arguments.
 
   + Transit data between pipes 
 
-    As a pipe receives the output from the command before the pipe
+    A pipe receives the output from the command before the pipe
 
-    sign and make is as the input to the command after pipe sign. 
+    sign and makes it the input to the command after pipe sign. 
 
     
 
