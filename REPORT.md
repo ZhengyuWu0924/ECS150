@@ -4,6 +4,28 @@ Akash Arun Malode, 914706364
 
 Zhengyu Wu, 916951023
 
+## Purpose
+To create a shell (sshell) which implements builtin commands,
+
+output redirection, pipeline commands, and extra features
+
+(appending and displaying file sizes),
+
+using forked processes and system calls.
+
+## Design Choices
+We decided to create two structures- one for the command and
+
+its arguments, and another for piping. The command structure 
+
+includes a command, an array of potential arguments, and a
+
+filename slot (in case redirection is needed). The pipe 
+
+structure uses the command structure to ensure each pipe segment
+
+has its own command and arguments.
+
 ## Execution Procedure
 
 
