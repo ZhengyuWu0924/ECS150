@@ -10,22 +10,42 @@
 #include "uthread.h"
 #include "queue.h"
 
+#define IDLE 0
+#define RUNNING 1
+#define READY 2
+#define EXITED 3
+
 queue_t threads;
+uthread_tcb current_thread;
 
 struct uthread_tcb {
-	int state; // 0 for running, 1 for ready, 2 for exited
+	int state; // states are described above
     uthread_ctx_t ctx; // context for the thread. We will set context during thread creation
     char *stack; // We will initialize this during thread creation
 };
 
 struct uthread_tcb *uthread_current(void)
 {
-	/* TODO Phase 2 */
+	return current_thread;
 }
 
 void uthread_yield(void)
 {
-	/* TODO Phase 2 */
+	// Get the head of the queue
+    // move the selected TCB to the end of the queue
+    // switch context into this TCB
+    uthread_tcb next_thread;
+
+    current_thread = threads->head;
+    next_thread = threads->head->next;
+
+    // Take it from the start of queue, push it to end of queue
+    queue_dequeue(threads, current_thread);
+    queue_enqueue(threads, current_thread);
+
+    uthread_ctx_switch(current_thread->ctx, next_thread->ctx);
+
+
 }
 
 void uthread_exit(void)
@@ -57,20 +77,27 @@ int uthread_create(uthread_func_t func, void *arg)
 
 int uthread_start(uthread_func_t func, void *arg)
 {
+    /* IDEA:
+     * Create a thread
+     * switch context to this thread
+     * then, this thread is run
+     * in the infinite loop, call uthread_yield(), so it looks for other runnable threads
+     * after the infinite loop, call uthread_exit()
+     */
     // queue_t threads was declared as a global variable. Initialize it here
     threads = queue_create();
 
-	// Create a new thread
-    // Infinite while loop until no more threads are ready to run
+	// Assign everything that a thread needs
+    // Create an "idle" thread
 
-    if (uthread_create(func, arg) == -1) {
-        return -1;
-    }
+    uthread_create(func, arg);
 
     // Infinite loop until no more threads are ready to run in the system
     while (queue_length(threads) != 0) {
-        // Keep going until there are no more ready threads
+        uthread_yield();
     }
+
+    uthread_exit();
 
 }
 
