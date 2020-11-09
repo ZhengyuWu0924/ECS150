@@ -15,14 +15,19 @@
 #define READY 2
 #define EXITED 3
 
-queue_t threads;
-uthread_tcb current_thread;
-
 struct uthread_tcb {
 	int state; // states are described above
-    uthread_ctx_t ctx; // context for the thread. We will set context during thread creation
+    uthread_ctx_t* ctx; // context for the thread. We will set context during thread creation
     char *stack; // We will initialize this during thread creation
+	int thread_id; // Thread id.
 };
+
+// queue_t threads_MAIN;
+queue_t threads;
+
+struct uthread_tcb* current_thread;
+
+
 
 struct uthread_tcb *uthread_current(void)
 {
@@ -34,18 +39,15 @@ void uthread_yield(void)
 	// Get the head of the queue
     // move the selected TCB to the end of the queue
     // switch context into this TCB
-    uthread_tcb next_thread;
-
-    current_thread = threads->head;
-    next_thread = threads->head->next;
+    struct uthread_tcb* next_thread;
+    // current_thread = threads->head;
+    // next_thread = threads->head->next;
 
     // Take it from the start of queue, push it to end of queue
     queue_dequeue(threads, current_thread);
     queue_enqueue(threads, current_thread);
 
     uthread_ctx_switch(current_thread->ctx, next_thread->ctx);
-
-
 }
 
 void uthread_exit(void)
@@ -56,13 +58,13 @@ void uthread_exit(void)
 int uthread_create(uthread_func_t func, void *arg)
 {
     // First, create a TCB for thread. Set state to ready, initialize stack, initialize context
-    uthread_tcb thread = malloc(sizeof(uthread_tcb));
+	struct uthread_tcb* thread = malloc(sizeof(struct uthread_tcb));
 
     if (thread == NULL) {
         return -1;
     }
 
-    thread->state = 1;
+    thread->state = RUNNING;
     thread->stack = (char*)uthread_ctx_alloc_stack();
     //
     // CHECK void *top_of_stack IS SET TO 1. CHECK IF CORRECT.
@@ -86,7 +88,7 @@ int uthread_start(uthread_func_t func, void *arg)
      */
     // queue_t threads was declared as a global variable. Initialize it here
     threads = queue_create();
-
+	
 	// Assign everything that a thread needs
     // Create an "idle" thread
 
