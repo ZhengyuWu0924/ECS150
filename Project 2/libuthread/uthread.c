@@ -43,16 +43,30 @@ void uthread_yield(void)
     // current_thread = threads->head;
     // next_thread = threads->head->next;
 
+
     // Take it from the start of queue, push it to end of queue
     queue_dequeue(threads, current_thread);
-    queue_enqueue(threads, current_thread);
-
-    uthread_ctx_switch(current_thread->ctx, next_thread->ctx);
+	
+	
+	if(queue_length > 0){
+		queue_dequeue(threads, next_thread);
+		if(next_thread != NULL){
+			uthread_ctx_switch(current_thread->ctx, next_thread->ctx);
+		} else {
+			perror("Nothing to yield");
+			exit(-1);
+		}
+	}
+	queue_enqueue(threads, current_thread);
+	
+    
+    exit(0);
 }
 
 void uthread_exit(void)
 {
-	/* TODO Phase 2 */
+	free(current_thread);
+	uthread_yield();
 }
 
 int uthread_create(uthread_func_t func, void *arg)

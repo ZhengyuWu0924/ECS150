@@ -152,7 +152,6 @@ int queue_delete(queue_t queue, void *data)
             current = current->next;
             previous->next = current;
         }
-        i++;
     }
     if(found == 0){ // data was not found
         return ERROR;
@@ -190,4 +189,3 @@ int queue_length(queue_t queue)
     queueLen = queue->length;
     return queueLen;
 }
-
