@@ -27,8 +27,6 @@ queue_t threads;
 
 struct uthread_tcb* current_thread;
 
-
-
 struct uthread_tcb *uthread_current(void)
 {
 	return current_thread;
@@ -45,11 +43,11 @@ void uthread_yield(void)
 
 
     // Take it from the start of queue, push it to end of queue
-    queue_dequeue(threads, current_thread);
-	
-	
+    queue_dequeue(threads, (void**)&current_thread);
+
+
 	if(queue_length > 0){
-		queue_dequeue(threads, next_thread);
+		queue_dequeue(threads, (void**)&next_thread);
 		if(next_thread != NULL){
 			uthread_ctx_switch(current_thread->ctx, next_thread->ctx);
 		} else {
@@ -58,8 +56,8 @@ void uthread_yield(void)
 		}
 	}
 	queue_enqueue(threads, current_thread);
-	
-    
+
+
     exit(0);
 }
 
@@ -83,7 +81,7 @@ int uthread_create(uthread_func_t func, void *arg)
     //
     // CHECK void *top_of_stack IS SET TO 1. CHECK IF CORRECT.
     //
-	if (uthread_ctx_init(thread->ctx, 1, func, arg) == -1) { // type conversion because function returns void*
+	if (uthread_ctx_init(thread->ctx, thread->stack, func, arg) == -1) { // type conversion because function returns void*
         return -1;
     }
     // Now that the thread is set up and is ready to run, we can push it into the queue (phase 1)
@@ -102,7 +100,7 @@ int uthread_start(uthread_func_t func, void *arg)
      */
     // queue_t threads was declared as a global variable. Initialize it here
     threads = queue_create();
-	
+
 	// Assign everything that a thread needs
     // Create an "idle" thread
 
