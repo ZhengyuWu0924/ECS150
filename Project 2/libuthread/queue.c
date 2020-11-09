@@ -98,7 +98,7 @@ int queue_dequeue(queue_t queue, void **data)
     }
     oldest = queue->head;
     // assign the value of a pointer to data
-    data = oldest->data;
+    *data = oldest->data;
     // rearrange the queue
     if(queue->length == 1){ // original queue has only 1 element
         // set queue to empty
@@ -122,24 +122,26 @@ int queue_delete(queue_t queue, void *data)
     }
     int found = 0;
     int queueLen = queue->length;
-    struct node* previous = NULL;
+    struct node* previous = malloc(sizeof(struct node));
     struct node* current = queue->head;
-
+    previous = NULL;
     for(int i = 0; i < queueLen; i++){
         if(current->data == data){
             found = 1;
             // goal data is the head of the queue
-            if(previous == NULL){
+            if(i == 0){
                 if(queue->length == 1){ // only one element in the queue
                     queue->length--;
                     queue->head = NULL;
                     queue->tail = NULL;
                     free(current); // deallocate the goal data in queue
-                } else { // more than one elements in the queue
+                
+                } else if(queue->length > 1) { // more than one elements in the queue
                     queue->length--;
-                    previous->next = current->next;
-                    queue->head = previous;
-                    free(current); // deallocate the goal data in queue
+                    
+                    current = queue->head->next;// deallocate the goal data in queueQ
+                    queue->head = NULL;
+                    queue->head = current;
                 }
             } else { // goal data is not the head of the queue
                 queue->length--;
