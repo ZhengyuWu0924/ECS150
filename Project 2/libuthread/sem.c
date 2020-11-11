@@ -11,7 +11,7 @@
 struct semaphore {
 	size_t count; // maximum internal count
 	int waiting; // 1 if threads are blocked, 0 if no more thread waiting
-	struct uthread_tcb* uthread; // *** Not sure if we can add uthread like this ***
+	// struct uthread_tcb* uthread; // *** Not sure if we can add uthread like this ***
 };
 
 sem_t sem_create(size_t count)
@@ -71,7 +71,7 @@ int sem_up(sem_t sem)
 	// still able to include the uthread pointer at the beginning of this
 	// file?
 
-	uthread_unblock(sem->uthread);
+	// uthread_unblock();
 	return SUCCESS;
 }
 
