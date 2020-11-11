@@ -19,11 +19,11 @@ struct uthread_tcb {
 	int state; // states are described above
     uthread_ctx_t ctx; // context for the thread. We will set context during thread creation
     char* stack; // We will initialize this during thread creation
-	int thread_id; // Thread id.
 };
 
 // queue_t threads_MAIN;
-queue_t threads;
+queue_t readyThreads;
+queue_t waitingThreads;
 
 struct uthread_tcb* current_thread;
 
@@ -62,8 +62,8 @@ void uthread_yield(void)
     */
 
     struct uthread_tcb* prev_thread = current_thread;
-    queue_enqueue(threads, current_thread);
-    queue_dequeue(threads, (void**)&current_thread);
+    queue_enqueue(readyThreads, current_thread);
+    queue_dequeue(readyThreads, (void**)&current_thread);
     struct uthread_tcb* next_thread = current_thread;
     uthread_ctx_switch(&(prev_thread->ctx), &(next_thread->ctx));
 
@@ -95,7 +95,7 @@ int uthread_create(uthread_func_t func, void *arg)
     }
 
     // Now that the thread is set up and is ready to run, we can push it into the queue
-    queue_enqueue(threads, thread);
+    queue_enqueue(readyThreads, thread);
     return 0;
 }
 
@@ -110,8 +110,8 @@ int uthread_start(uthread_func_t func, void *arg)
      */
     // queue_t threads was declared as a global variable. Initialize it here
 
-    threads = queue_create();
-
+    readyThreads = queue_create();
+    waitingThreads = queue_create();
 	// Assign everything that a thread needs
     // Create an "idle" thread
 
@@ -122,7 +122,7 @@ int uthread_start(uthread_func_t func, void *arg)
     uthread_create(func, arg);
 
     // Infinite loop until no more threads are ready to run in the system
-    while (queue_length(threads) != 0) {
+    while (queue_length(readyThreads) != 0) {
         uthread_yield();
     }
 
@@ -132,10 +132,40 @@ int uthread_start(uthread_func_t func, void *arg)
 
 void uthread_block(void)
 {
-	/* TODO Phase 2/3 */
+	queue_enqueue(waitingThreads, current_thread);
+    uthread_yield();
 }
 
 void uthread_unblock(struct uthread_tcb *uthread)
 {
-	/* TODO Phase 2/3 */
+    // remove certain thread from waiting to ready
+
+    struct uthread_tcb* cur;
+    // queue_t tempQueue;
+    // for(int i = 0; i < queue_length(waitingThreads); i++){
+    //     queue_dequeue(waitingThreads, cur);
+    //     if(cur == uthread){
+    //         queue_enqueue(readyThreads, cur);
+    //     } else {
+    //         queue_enqueue(tempQueue, cur);
+    //     }
+    // }
+    // queue_destroy(waitingThreads);
+    // waitingThreads = queue_create();
+    // waitingThreads = tempQueue;
 }
+
+// 1 2 3 4 5 6 7
+// target 5
+// 2 3 4 5 6 7 | temp =1
+// 3 4 5 6 7 | temmp = 1 2
+// ...
+// 5 6 7 | temp = 1 2 3 4
+// take out 5
+// 6 7 |temp =1 2 3 4 
+// temp = 1 2 3 4 6 7
+// waiting.dequeue(elements left)
+// queue.delete(waitingThread)
+// queue create (waiting thread)
+// waitingThread = temp
+// O(n)
